@@ -112,9 +112,14 @@ def read_file_bytes(file_path):
         sys.exit(1)
 
 
-def read_patching(file_bytes):
+def read_patching_and_groups(file_bytes):
+    '''
+    We do both patches and groups in the same function because both are under the "#patching#" section in the .lshw file
+    I'm reading attributes the complicated way to see if my theory works (also to match how lightshark reads the file kinda?)
+    '''
     
     patching = []
+    groups = []
 
     ptr = file_bytes.find(b'\xAA#patching#')
     assert ptr != -1, "Could not find #patching# in file"
@@ -122,6 +127,8 @@ def read_patching(file_bytes):
 
     ptr += 11
     logging.debug(file_bytes[ptr:ptr+10])
+
+    ## PATCHES ##
     while file_bytes[ptr:ptr+10] == b'\x00\x00\x00\x06\xa5patch':
         patch = {}
         patch_bytelength = int.from_bytes(file_bytes[ptr+10:ptr+14], 'big')
@@ -129,10 +136,10 @@ def read_patching(file_bytes):
         assert file_bytes[ptr+14:ptr+17] == b'\xde\x00\x10', "xDE0010 not spotted at the right location of patch :("
         ptr += 17
 
-        # Start reading attributes. Doing it the complicated way to see if my theory works (also to match how lightshark reads the file kinda?)
+        # Start reading attributes
         logging.debug(file_bytes[ptr:ptr+1])
         attributes = ['model_id', 'inverse_tilt', 'name', 'channels_ftype', 'index', 'universe', 'description', 'inverse_pan', 'visual_id', 'parked', 'color_mark', 'dimmer', 'swap_pan_tilt', 'virtual_dimmer', 'id', 'size']
-        while file_bytes[ptr:ptr+1] != b'\x00':
+        while file_bytes[ptr] != 0x00:
             attr_name_len = file_bytes[ptr] - 0xA0
             attr_name = file_bytes[ptr+1:ptr+attr_name_len+1].decode('utf-8')
             # logging.debug(f"Found attribute \"{attr_name}\" of length {attr_name_len} bytes")
@@ -189,8 +196,15 @@ def read_patching(file_bytes):
         logging.debug("FOUND PATCH: " + str(patching[-1].__dict__)+"\n"+"-"*80)
 
 
+    ## GROUPS ##
+    while file_bytes[ptr:ptr+10] == b'\x00\x00\x00\x06\xa5group':
+
+        group = {}
+        
+        #TODO: implement!#
+
                     
-                    
+        groups.append(Groups(**group))            
                 
                 
 
@@ -200,7 +214,7 @@ def read_patching(file_bytes):
 
 
 
-    return patching
+    return patching, groups
 
 
 def parse_file_bytes(file_bytes):
