@@ -1,145 +1,8 @@
-import argparse
 import logging
-from os import pathconf_names
 import sys
-import json
-import re
-from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Tuple, Any, Optional
+from .classes import Lightshow, Patch, Group
+from .utils.json_encoder import CompactJSONEncoder
 
-class Lightshow:
-    def __init__(self):
-        self._fileinfo = {}
-        self._models = {}
-        self._patches = {}
-        self._groups = {}
-        self._user_palettes = {}
-        self._cues = {}
-
-    def __init__(self, fileinfo={}, models={}, patches={}, groups={}, user_palettes={}, cues={}):
-        self._fileinfo = fileinfo
-        self._models = models
-        self._patches = patches
-        self._groups = groups
-        self._user_palettes = user_palettes
-        self._cues = cues
-
-    def add_model(self, model):
-        self._models[model.id] = model
-    
-    def add_patch(self, patch):
-        self._patches[patch.id] = patch
-
-    def add_group(self, group):
-        self._groups[group.id] = group
-
-    def add_palette(self, palette):
-        self._user_palettes[palette.id] = palette
-
-    def add_cue(self, cue):
-        self._cues[cue.id] = cue
-
-    def parse_to_bytes(self):
-        pass
-
-    def to_dict(self):
-        """Convert the Lightshow object to a dictionary for JSON serialization."""
-        return {
-            'fileinfo': self._fileinfo,
-            'models': [model.__dict__ for model in self._models.values()] if self._models else [],
-            'patches': [patch.__dict__ for patch in self._patches.values()] if self._patches else [],
-            'groups': [group.__dict__ for group in self._groups.values()] if self._groups else [],
-            'user_palettes': self._user_palettes or {},
-            'cues': self._cues or {}
-        }
-
-
-
-class Model:
-    def __init__(self, model_id):
-        self.model_id = model_id
-        self.palettes = []
-
-class Patch:
-
-    def __init__(self):
-        self.model_id = None
-        self.inverse_tilt = None
-        self.name = None
-        self.channels_ftype = []
-        self.index = None
-        self.universe = None
-        self.description = None
-        self.inverse_pan = None
-        self.visual_id = None
-        self.parked = None
-        self.color_mark = None
-        self.dimmer = []
-        self.swap_pan_tilt = None
-        self.virtual_dimmer = []
-        self.id = None
-        self.size = None
-
-    def __init__(self, model_id, inverse_tilt, name, channels_ftype, index, universe, description, inverse_pan, visual_id, parked, color_mark, dimmer, swap_pan_tilt, virtual_dimmer, id, size):
-        self.model_id = model_id
-        self.inverse_tilt = inverse_tilt
-        self.name = name
-        self.channels_ftype = channels_ftype
-        self.index = index
-        self.universe = universe
-        self.description = description
-        self.inverse_pan = inverse_pan
-        self.visual_id = visual_id
-        self.parked = parked
-        self.color_mark = color_mark
-        self.dimmer = dimmer
-        self.swap_pan_tilt = swap_pan_tilt
-        self.virtual_dimmer = virtual_dimmer
-        self.id = id
-        self.size = size
-
-
-class Group:
-
-    def __init__(self):
-        self.description = None
-        self.color_mark = None
-        self.visual_id = None
-        self.patched_elements_ids = []
-        self.grid = {}
-        self.steps = {}
-        self.automatico = None
-        self.group_id = None
-
-    def __init__(self, description, color_mark, visual_id, patched_elements_ids, grid, steps, automatico, group_id):
-        self.description = description
-        self.color_mark = color_mark
-        self.visual_id = visual_id
-        self.patched_elements_ids = patched_elements_ids
-        self.grid = grid
-        self.steps = steps
-        self.automatico = automatico
-        self.group_id = group_id
-
-# class UserPalette:
-
-#     def __init__(self):
-#         self.section =
-#         self.user_palette_id = 
-#         self.name = 
-#         self.orders = 
-
-# class OrderPalette:
-
-#     def __init__(self):
-#         self.palete_id =
-#         self.universe = 
-#         self.section = 
-#         self.receptor_type = 
-#         self.patch_id = 
-#         self.ftype = 
-#         self.value = 
-#         self.channel = 
 
 
 def read_file_bytes(file_path):
@@ -223,7 +86,8 @@ def read_patch(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
             patch[attr_name] = []
             ptr += 1
             for i in range(num_channels):
-                ftype_len = file_bytes[ptr] - 0xCB
+                # NOTE: this 2^ thing could be wrong
+                ftype_len = 0 if file_bytes[ptr] == 0xCB else 2**(file_bytes[ptr] - 0xCC)
                 patch[attr_name].append(file_bytes[ptr+1:ptr+ftype_len+1].decode('utf-8'))
                 ptr += ftype_len + 1
         elif attr_name == 'dimmer':
@@ -314,8 +178,21 @@ def parse_file_bytes(file_bytes):
 
     NOTE: add a bunch of asserts inbetween to ensure that the x98 88 and whatnot are working fine
     2nd NOTE: i think u can kinda do this for the rest of the main sections tbh
-
     '''
+    # Find all instances of xCD + 2 bytes + xCC pattern
+    # cd_cc_pattern = re.compile(b'\xCD..\xCC')
+    # cd_cc_matches = [match.start() for match in cd_cc_pattern.finditer(file_bytes)]
+    # if cd_cc_matches:
+    #     print(f"Found {len(cd_cc_matches)} instances of xCD + 2 bytes + xCC at positions: {cd_cc_matches}")
+    #     # Display the bytes in both hex and ASCII
+    #     bytes_to_show = file_bytes[cd_cc_matches[-1]-50:cd_cc_matches[-1]+50]
+    #     hex_str = ' '.join(f'{b:02x}' for b in bytes_to_show)
+    #     # Create ASCII representation, replacing non-printable chars with '.'
+    #     ascii_str = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in bytes_to_show)
+    #     print("Hex:", hex_str)
+    #     print("ASCII:", ascii_str)
+    # else:
+    #     print("No instances of xCD + 2 bytes + xCC found")
     patching = {} # Key: patch ID, Value: Patch object
     groups = {} # Key: group ID, Value: Group object
     user_palettes = {}
@@ -354,105 +231,5 @@ def parse_file_bytes(file_bytes):
     )
 
 
-class CompactJSONEncoder(json.JSONEncoder):
-    """
-    Custom JSON encoder that formats simple lists on a single line.
-    (Credits: AI generated this encoder lol thank you AI)
-    
-    Simple values (numbers, strings, booleans, None) in lists will be kept on one line.
-    Complex values (objects, nested lists) will be formatted with proper indentation.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._indent = kwargs.get('indent', 2)
-        self._current_indent = 0
-    
-    def encode(self, obj):
-        if isinstance(obj, (list, tuple)):
-            # For lists, check if all items are simple values (can be on one line)
-            if all(isinstance(x, (int, float, str, bool)) or x is None for x in obj):
-                return '[' + ', '.join(json.dumps(x, ensure_ascii=False) for x in obj) + ']'
-            
-            # For lists with complex items, handle with proper indentation
-            self._current_indent += self._indent
-            indent = ' ' * self._current_indent
-            result = '['
-            first = True
-            
-            for item in obj:
-                if first:
-                    first = False
-                else:
-                    result += ','
-                result += '\n' + indent + self.encode(item)
-            
-            self._current_indent -= self._indent
-            result += '\n' + ' ' * self._current_indent + ']'
-            return result
-            
-        elif isinstance(obj, dict):
-            # For dictionaries, always use newlines and proper indentation
-            self._current_indent += self._indent
-            indent = ' ' * self._current_indent
-            result = '{\n' + indent
-            first = True
-            
-            # Sort keys for consistent output
-            for key in sorted(obj.keys(), key=str):
-                if first:
-                    first = False
-                else:
-                    result += ',\n' + indent
-                # Ensure key is a string
-                key_str = str(key) if not isinstance(key, str) else key
-                result += json.dumps(key_str, ensure_ascii=False) + ': ' + self.encode(obj[key])
-            
-            self._current_indent -= self._indent
-            result += '\n' + ' ' * self._current_indent + '}'
-            return result
-            
-        else:
-            # For simple values, use the default JSON encoding
-            return json.dumps(obj, ensure_ascii=False)
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Read and parse .lshw files')
-    parser.add_argument('file', nargs='?', help='Path to the .lshw file to be parsed')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
-    parser.add_argument('-o', '--output', help='Output JSON file to save the parsed data')
-    args = parser.parse_args()
-
-    if not args.file:
-        parser.print_help()
-        sys.exit(1)
-
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    
-    file_bytes = read_file_bytes(args.file)
-    logging.debug(f"Successfully read {len(file_bytes)} bytes from {args.file}")
-
-    lightshow = parse_file_bytes(file_bytes)
-    print("Successfully parsed file!")
-    
-    if args.output:
-        try:
-            # Convert to dict and format with compact lists
-            data = lightshow.to_dict()
-            json_str = CompactJSONEncoder(indent=2, ensure_ascii=False).encode(data)
-            
-            # Write the output
-            with open(args.output, 'w', encoding='utf-8') as f:
-                f.write(json_str)
-            
-            print(f"Successfully saved to {args.output}")
-        except Exception as e:
-            print(f"Error saving to {args.output}: {e}", file=sys.stderr)
-
-
-
-
-
-if __name__ == "__main__":
-    main()
