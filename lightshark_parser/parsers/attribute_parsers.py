@@ -14,6 +14,27 @@ def _read_byte_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str)
     obj[attr_name] = file_bytes[ptr]
     return ptr + 1
 
+def _read_multibyte_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str, check: bytes = None) -> int:
+    # If value is >= \xCC, it could be a length indicator for a value that is >255
+    # NOTE: Might have edge cases that could cause this to break
+    if file_bytes[ptr] <= 0xCB:
+        return _read_byte_attribute(file_bytes, ptr, obj, attr_name)
+    else:
+        value_length = 2**(file_bytes[ptr] - 0xCC)
+        # If no check given assume that multibyte is correct
+        if check is None:
+            obj[attr_name] = int.from_bytes(file_bytes[ptr+1:ptr+1+value_length], 'big')
+            return ptr + value_length + 1
+        else:
+            #Check if the bytes after match check. If they don't then it's likely that value just happened to be >= \xCC
+            if file_bytes[ptr+1+value_length:ptr+1+value_length+len(check)] == check:
+                obj[attr_name] = int.from_bytes(file_bytes[ptr+1:ptr+1+value_length], 'big')
+                return ptr + value_length + 1
+            else:
+                #Single byte case
+                ptr = _read_byte_attribute(file_bytes, ptr, obj, attr_name)
+                assert file_bytes[ptr+1+value_length:ptr+1+value_length+len(check)] == check, "Error reading multibyte value attribute"
+                return ptr
 def _read_boolean_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str) -> int:
     assert file_bytes[ptr] in [0xC2, 0xC3], f"Error: {attr_name} value is not a boolean (0xC2 or 0xC3)"
     obj[attr_name] = file_bytes[ptr] == 0xC3
@@ -24,18 +45,30 @@ def _read_string_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: st
     obj[attr_name] = file_bytes[ptr+1:ptr+1+str_len].decode('utf-8')
     return ptr + 1 + str_len
 
+def _read_obj_list_len(file_bytes: bytes, ptr: int) -> tuple[int, int]:
+    if file_bytes[ptr] > 0x9f:
+        assert file_bytes[ptr] in [0xDC, 0xDE], "Error: Invalid list length indicator"
+        # logging.debug("List Length starting byte: " + hex(file_bytes[ptr]))
+        # Read 2 bytes for value
+        length = int.from_bytes(file_bytes[ptr+1:ptr+3], 'big')
+        return length, ptr + 3
+    else:
+        length = file_bytes[ptr] - 0x90  # For small lists, length is stored as 0x90 + length
+        return length, ptr + 1
+
+
 def _read_list_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str) -> int:
     num_items = file_bytes[ptr] - 0x90
     obj[attr_name] = []
     ptr += 1
-    for i in range(num_items):
+    for _ in range(num_items):
         obj[attr_name].append(file_bytes[ptr])
         ptr += 1
     return ptr
 
 
 def _obj_bytelength_check(initial_ptr: int, ptr: int, obj_bytelength: int, num_attr: int, num_attr_indicated: int):
-    logging.debug("Current ptr: %s, Initial+indicated: %s", ptr, initial_ptr + obj_bytelength)
+    logging.debug("Current pointer: %s, Expected end: %s", ptr, initial_ptr + obj_bytelength)
     assert initial_ptr + obj_bytelength == ptr, "Error: object bytelength indicated does not match actual object bytelength"
-    logging.debug("Number of attributes: %s, Indicated: %s", num_attr, num_attr_indicated)
+    logging.debug("Number of attributes found: %d, Expected: %d", num_attr, num_attr_indicated)
     assert num_attr == num_attr_indicated, "Error: number of attributes does not match expected number of attributes" 

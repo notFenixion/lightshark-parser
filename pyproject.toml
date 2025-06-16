@@ -9,6 +9,9 @@ version = "1.0.0"
 description = "A parser for Lightshark show files (.lshw)"
 readme = "README.md"
 requires-python = ">=3.7"
+dependencies = [
+    "orjson>=3.9.0",
+]
 
 
 [project.scripts]
