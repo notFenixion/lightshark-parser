@@ -57,17 +57,24 @@ def _read_obj_list_len(file_bytes: bytes, ptr: int) -> tuple[int, int]:
         return length, ptr + 1
 
 
-def _read_list_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str) -> int:
+def _read_list_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str, attribute_type: str = "byte") -> int:
     num_items = file_bytes[ptr] - 0x90
     obj[attr_name] = []
     ptr += 1
     for _ in range(num_items):
-        obj[attr_name].append(file_bytes[ptr])
+        if attribute_type == "bool":
+            # Convert byte to boolean (0x00 = False, anything else = True)
+            assert file_bytes[ptr] in [0xC2, 0xC3], "Byte found in list does not correspond to True/False"
+            obj[attr_name].append(file_bytes[ptr] == 0xC3)
+        elif attribute_type == "byte":
+            obj[attr_name].append(file_bytes[ptr])
+        else:
+            raise ValueError(f"Unsupported attribute_type: {attribute_type}")
         ptr += 1
     return ptr
 
 
-def _obj_bytelength_check(initial_ptr: int, ptr: int, obj_bytelength: int, num_attr: int, num_attr_indicated: int):
+def _obj_checker(initial_ptr: int, ptr: int, obj_bytelength: int, num_attr: int, num_attr_indicated: int):
     logging.debug("Current pointer: %s, Expected end: %s", ptr, initial_ptr + obj_bytelength)
     assert initial_ptr + obj_bytelength == ptr, "Error: object bytelength indicated does not match actual object bytelength"
     logging.debug("Number of attributes found: %d, Expected: %d", num_attr, num_attr_indicated)

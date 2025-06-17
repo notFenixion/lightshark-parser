@@ -2,13 +2,17 @@ import orjson
 from typing import Dict, List, Any, Optional, Tuple
 
 class Lightshow:
-    def __init__(self, fileinfo: Dict = None, models: Dict = None, patches: Dict[Any, 'Patch'] = None, groups: Dict[Any, 'Group'] = None, user_palettes: Dict = None, cues: Dict = None):
+    def __init__(self, fileinfo: Dict = None, models: Dict = None, patches: Dict[Any, 'Patch'] = None, groups: Dict[Any, 'Group'] = None, user_palettes: Dict = None, cues: Dict = None, cuelists: Dict = None, playbacks: Dict = None, fxpalettes: Dict = None, general: Dict = None):
         self._fileinfo: Dict = fileinfo if fileinfo is not None else {}
         self._models: Dict[Any, Any] = models if models is not None else {}
         self._patches: Dict[Any, 'Patch'] = patches if patches is not None else {}
         self._groups: Dict[Any, 'Group'] = groups if groups is not None else {}
         self._user_palettes: Dict = user_palettes if user_palettes is not None else {}
         self._cues: Dict = cues if cues is not None else {}
+        self._cuelists: Dict = cuelists if cuelists is not None else {}
+        self._playbacks: Dict = playbacks if playbacks is not None else {}
+        self._fxpalettes: Dict = fxpalettes if fxpalettes is not None else {}
+        self._general: Dict = general if general is not None else {}
 
     def add_model(self, model: 'Model') -> None:
         self._models[model.id] = model
@@ -48,7 +52,11 @@ class Lightshow:
             'patches': [to_dict_recursive(patch) for patch in self._patches.values()],
             'groups': [to_dict_recursive(group) for group in self._groups.values()],
             'user_palettes': {str(k): to_dict_recursive(v) for k, v in self._user_palettes.items()},
-            'cues': {str(k): to_dict_recursive(v) for k, v in self._cues.items()}
+            'cues': {str(k): to_dict_recursive(v) for k, v in self._cues.items()},
+            'cuelists': {str(k): to_dict_recursive(v) for k, v in self._cuelists.items()},
+            'playbacks': {str(k): to_dict_recursive(v) for k, v in self._playbacks.items()},
+            'fxpalettes': {str(k): to_dict_recursive(v) for k, v in self._fxpalettes.items()},
+            'general': to_dict_recursive(self._general)
         }
 
 
@@ -402,6 +410,138 @@ class FX:
         }
         
 
+
+
+class Cuelist:
+
+    class CuelistElement:
+        """Represents a single element within a cuelist."""
+        def __init__(
+            self,
+            ms_fadeout: Optional[int] = None,
+            cue_id: Optional[int] = None,
+            ms_delay: Optional[int] = None,
+            next: Optional[int] = None,
+            dotted_id: Optional[str] = None,
+            ms_fadein: Optional[int] = None,
+            ms_crossfade: Optional[int] = None,
+                ms_duration: Optional[int] = None,
+            halt: Optional[bool] = None
+        ) -> None:
+            self.ms_fadeout: Optional[int] = ms_fadeout
+            self.cue_id: Optional[int] = cue_id
+            self.ms_delay: Optional[int] = ms_delay
+            self.next: Optional[int] = next
+            self.dotted_id: Optional[str] = dotted_id
+            self.ms_fadein: Optional[int] = ms_fadein
+            self.ms_crossfade: Optional[int] = ms_crossfade
+            self.ms_duration: Optional[int] = ms_duration
+            self.halt: Optional[bool] = halt
+
+        def to_dict(self) -> dict:
+            """Convert the CuelistElement to a dictionary for JSON serialization."""
+            return {
+                'ms_fadeout': self.ms_fadeout,
+                'cue_id': self.cue_id,
+                'ms_delay': self.ms_delay,
+                'next': self.next,
+                'dotted_id': self.dotted_id,
+                'ms_fadein': self.ms_fadein,
+                'ms_crossfade': self.ms_crossfade,
+                'ms_duration': self.ms_duration,
+                'halt': self.halt
+            }
+
+    """Represents a cuelist in the lighting console."""
+    def __init__(
+        self,
+        ms_flash_attack: Optional[int] = None,
+        autoreset: Optional[bool] = None,
+        at_end_pause: Optional[bool] = None,
+        loops: Optional[int] = None,
+        chase: Optional[bool] = None,
+        ms_chase_time: Optional[int] = None,
+        visual_id: Optional[int] = None,
+        bpm_chase: Optional[bool] = None,
+        ms_flash_decay: Optional[int] = None,
+        pcrossfade: Optional[bool] = None,
+        ms_fadeout: Optional[int] = None,
+        direction: Optional[int] = None,
+        at_end_stop: Optional[bool] = None,
+        flash_mode: Optional[bool] = None,
+        cuelist_id: Optional[int] = None,
+        ms_fadein: Optional[int] = None,
+        ms_crossfade: Optional[int] = None,
+        no_first_fade: Optional[bool] = None,
+        name: Optional[str] = None,
+        block_fx: Optional[bool] = None,
+        cuelist_elements: Optional[List[Dict]] = None,
+        ms_flash_hold: Optional[int] = None,
+        ms_stop_time: Optional[int] = None
+    ) -> None:
+        # Timing attributes
+        self.ms_flash_attack: Optional[int] = ms_flash_attack
+        self.ms_flash_decay: Optional[int] = ms_flash_decay
+        self.ms_flash_hold: Optional[int] = ms_flash_hold
+        self.ms_chase_time: Optional[int] = ms_chase_time
+        self.ms_fadein: Optional[int] = ms_fadein
+        self.ms_fadeout: Optional[int] = ms_fadeout
+        self.ms_crossfade: Optional[int] = ms_crossfade
+        self.ms_stop_time: Optional[int] = ms_stop_time
+        
+        # Boolean flags
+        self.autoreset: Optional[bool] = autoreset
+        self.chase: Optional[bool] = chase
+        self.bpm_chase: Optional[bool] = bpm_chase
+        self.pcrossfade: Optional[bool] = pcrossfade
+        self.at_end_pause: Optional[bool] = at_end_pause
+        self.at_end_stop: Optional[bool] = at_end_stop
+        self.flash_mode: Optional[bool] = flash_mode
+        self.no_first_fade: Optional[bool] = no_first_fade
+        self.block_fx: Optional[bool] = block_fx
+        
+        # Other attributes
+        self.loops: Optional[int] = loops
+        self.visual_id: Optional[int] = visual_id
+        self.direction: Optional[int] = direction
+        self.cuelist_id: Optional[int] = cuelist_id
+        self.name: Optional[str] = name
+        
+        # Complex attributes
+        self.cuelist_elements: List[CuelistElement] = [
+            CuelistElement(**element) if isinstance(element, dict) else element
+            for element in (cuelist_elements or [])
+        ]
+
+    def to_dict(self) -> dict:
+        """Convert the Cuelist to a dictionary for JSON serialization."""
+        return {
+            'ms_flash_attack': self.ms_flash_attack,
+            'autoreset': self.autoreset,
+            'at_end_pause': self.at_end_pause,
+            'loops': self.loops,
+            'chase': self.chase,
+            'ms_chase_time': self.ms_chase_time,
+            'visual_id': self.visual_id,
+            'bpm_chase': self.bpm_chase,
+            'ms_flash_decay': self.ms_flash_decay,
+            'pcrossfade': self.pcrossfade,
+            'ms_fadeout': self.ms_fadeout,
+            'direction': self.direction,
+            'at_end_stop': self.at_end_stop,
+            'flash_mode': self.flash_mode,
+            'cuelist_id': self.cuelist_id,
+            'ms_fadein': self.ms_fadein,
+            'ms_crossfade': self.ms_crossfade,
+            'no_first_fade': self.no_first_fade,
+            'name': self.name,
+            'block_fx': self.block_fx,
+            'cuelist_elements': [elem.to_dict() for elem in self.cuelist_elements],
+            'ms_flash_hold': self.ms_flash_hold,
+            'ms_stop_time': self.ms_stop_time
+        }
+
+
 class Playback:
     def __init__(self, fader_value=None, on_load_play=None, fader_mode=None, chase=None, index=None, ms_chase_time=None, fader_up_play=None, priority=None, bpm_chase=None, on_page_stop=None, trigger_level=None, is_executor=None, pcrossfade=None, ms_fadeout=None, fader_down_stop=None, ms_fadein=None, ms_crossfade=None, on_page_play=None, xct_color=None, cuelist=None, xct_push_mode=None, docked=None, xct_cuelist=None, page=None):
         self.fader_value = fader_value
@@ -428,6 +568,11 @@ class Playback:
         self.docked = docked
         self.xct_cuelist = xct_cuelist
         self.page = page
+        
+    @property
+    def combined_id(self):
+        """Return a combined ID using both page and index in the format 'page.index'"""
+        return f"{self.page}.{self.index}" if self.page is not None and self.index is not None else str(self.index)
 
 
 class General:
@@ -443,3 +588,63 @@ class General:
     
     def __init__(self, config=None):
         self.config = config if config is not None else self.Config()
+
+
+
+class FXPalette:
+    def __init__(self, fx_palette: int = None, cue_id: int = None, visual_id: int = None, 
+                 fxs: List['FX'] = None, fxs_channels: List[dict] = None, 
+                 orders: List[Order] = None, name: str = None) -> None:
+        self.fx_palette: int = fx_palette
+        self.cue_id: int = cue_id
+        self.visual_id: int = visual_id
+        self.fxs: List['FX'] = fxs if fxs is not None else []
+        self.fxs_channels: List[dict] = fxs_channels if fxs_channels is not None else []
+        self.orders: List[Order] = orders if orders is not None else []
+        self.name: str = name
+        
+    def to_dict(self) -> dict:
+        """Convert the Cue object to a dictionary for JSON serialization."""
+        # Helper function to convert bytes to Unicode escape sequences in nested structures
+        def convert_bytes(obj):
+            if isinstance(obj, bytes):
+                # Convert bytes to a string of Unicode escape sequences (e.g., b'\x02\x04' -> '\\u0002\\u0004')
+                return ''.join(f'\\u{byte:04x}' for byte in obj)
+            elif isinstance(obj, dict):
+                return {str(k): convert_bytes(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_bytes(item) for item in obj]
+            return obj
+            
+        # Convert fxs_channels to ensure all bytes are converted to Unicode escape sequences
+        converted_fxs_channels = convert_bytes(self.fxs_channels)
+        
+        # Convert fxs list
+        fxs_list = []
+        for fx in self.fxs:
+            if hasattr(fx, 'to_dict'):
+                fxs_list.append(fx.to_dict())
+            elif hasattr(fx, '__dict__'):
+                fxs_list.append(fx.__dict__)
+            else:
+                fxs_list.append(fx)
+        
+        # Convert orders
+        orders_list = []
+        for order in self.orders:
+            if hasattr(order, 'to_dict'):
+                orders_list.append(order.to_dict())
+            elif hasattr(order, '__dict__'):
+                orders_list.append(order.__dict__)
+            else:
+                orders_list.append(order)
+        
+        return {
+            'fx_palette': self.fx_palette,
+            'cue_id': self.cue_id,
+            'visual_id': self.visual_id,
+            'fxs': fxs_list if self.fxs else None,  # Set to None if empty list
+            'fxs_channels': converted_fxs_channels,
+            'orders': orders_list,
+            'name': self.name
+        }

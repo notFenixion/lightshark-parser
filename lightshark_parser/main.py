@@ -6,8 +6,8 @@ import orjson
 from pathlib import Path
 from typing import Dict, Any
 
-from .classes import Lightshow, Patch, Group, UserPalette, Cue
-from .parsers.section_parsers import read_patch, read_group, read_user_palette, read_cue
+from .classes import Lightshow
+from .parsers.section_parsers import read_patch, read_group, read_user_palette, read_cue, read_cuelist, read_playback, read_general, read_fxpalette
 
 def print_dash_line():
     try:
@@ -34,10 +34,20 @@ def read_file_bytes(file_path):
 
 
 def parse_file_bytes(file_bytes: bytes, output_file: str = None) -> Lightshow:
+    fileinfo = {}
+    models = {}
     patching = {} # Key: patch ID, Value: Patch object
     groups = {} # Key: group ID, Value: Group object
     user_palettes = {}
     cues = {}
+    cuelists = {}
+    playbacks = {}
+    general = {}
+    fxpalettes = {}
+    # other sections. i dont fully understand these yet so not parsing them for now
+    schedules = {}
+    osc_targets = {}
+
 
 
     # Initial search for #patching# section
@@ -52,28 +62,26 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None) -> Lightshow:
     while file_bytes[ptr:ptr+10] == b'\x00\x00\x00\x06\xa5patch':
         ptr += 10
         patch, ptr = read_patch(file_bytes, ptr)
-        patch_obj = Patch(**patch)
-        patching[patch_obj.id] = patch_obj
-        logging.info("FOUND PATCH: %s", patch_obj.__dict__)
+        patching[patch.id] = patch
+        logging.info("FOUND PATCH: %s", patch.__dict__)
         print_dash_line()
     if not patching:
         logging.warning("No patches found in file. This warning is only a concern if there are patches in your show but none were detected.")
 
     ## GROUPS ##
-    logging.debug("Finished reading patches. Moving onto groups...")
+    logging.info("Finished reading patches. Moving onto groups...")
     while file_bytes[ptr:ptr+10] == b'\x00\x00\x00\x06\xa5group':
         ptr += 10
         group, ptr = read_group(file_bytes, ptr)
-        group_obj = Group(**group)
-        groups[group_obj.group_id] = group_obj
-        logging.info("FOUND GROUP: %s", group_obj.__dict__)
+        groups[group.group_id] = group
+        logging.info("FOUND GROUP: %s", group.__dict__)
         print_dash_line()
     if not groups:
         logging.warning("No groups found in file. This warning is only a concern if there are groups in your show but none were detected.")
 
 
     ## USER PALETTES ##
-    logging.debug("Finished reading groups. Moving onto user palettes...")
+    logging.info("Finished reading groups. Moving onto user palettes...")
     # logging.debug(file_bytes[ptr:ptr+20])
     assert file_bytes[ptr:ptr+20] == b'\x00\x00\x00\x10\xaf#user_palettes#', "Could not find #user_palettes# in file"
     ptr += 20
@@ -87,33 +95,91 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None) -> Lightshow:
         else:
             deleted_flag = False
             palette, ptr = read_user_palette(file_bytes, ptr)
-            palette_obj = UserPalette(**palette)
-            user_palettes[palette_obj.user_palette_id] = palette_obj
-            logging.info("FOUND PALETTE: %s", palette_obj.__dict__)
+            user_palettes[palette.user_palette_id] = palette
+            logging.info("FOUND PALETTE: %s", palette.__dict__)
             print_dash_line()
     if not user_palettes:
         logging.warning("No user palettes found in file. This warning is only a concern if there are user palettes in your show but none were detected.")
     
     ## CUES ##
-    logging.debug("Finished reading groups. Moving onto cues...")
+    logging.info("Finished reading groups. Moving onto cues...")
     assert file_bytes[ptr:ptr+11] == b'\x00\x00\x00\x07\xa6#cues#', "Could not find #cues# in file"
     ptr += 11
     while file_bytes[ptr:ptr+8] == b'\x00\x00\x00\x04\xa3cue':
         ptr += 8
         cue, ptr = read_cue(file_bytes, ptr)
-        cue_obj = Cue(**cue)
-        cues[cue_obj.cue_id] = cue_obj
-        logging.info("FOUND CUE: %s", cue_obj.__dict__)
+        cues[cue.cue_id] = cue
+        logging.info("FOUND CUE: %s", cue.__dict__)
         print_dash_line()
     if not cues:
         logging.warning("No cues found in file. This warning is only a concern if there are cues in your show but none were detected.")
 
+    ## CUELISTS ##
+    logging.info("Finished reading cues. Moving onto cuelists...")
+    assert file_bytes[ptr:ptr+15] == b'\x00\x00\x00\x0b\xaa#cuelists#', "Could not find #cuelists# in file"
+    ptr += 15
+    while file_bytes[ptr:ptr+12] == b'\x00\x00\x00\x08\xa7cuelist':
+        ptr += 12
+        cuelist, ptr = read_cuelist(file_bytes, ptr)
+        cuelists[cuelist.cuelist_id] = cuelist
+        logging.info("FOUND CUELIST: %s", cuelist.__dict__)
+        print_dash_line()
+    if not cuelists:
+        logging.warning("No cuelists found in file. This warning is only a concern if there are cuelists in your show but none were detected.")
+
+    ## PLAYBACKS ##
+    logging.info("Finished reading cuelists. Moving onto playbacks...")
+    assert file_bytes[ptr:ptr+16] == b'\x00\x00\x00\x0c\xab#playbacks#', "Could not find #playbacks# in file"
+    ptr += 16
+    while file_bytes[ptr:ptr+13] == b'\x00\x00\x00\x09\xa8playback':
+        ptr += 13
+        playback, ptr = read_playback(file_bytes, ptr)
+        playbacks[playback.combined_id] = playback
+        logging.info("FOUND PLAYBACK (ID: %s): %s", playback.combined_id, playback.__dict__)
+        print_dash_line()
+    if not playbacks:
+        logging.warning("No playbacks found in file. This warning is only a concern if there are playback faders assigned in your show but none were detected.")
+    
+    ## GENERAL ##
+    logging.info("Finished reading playbacks. Moving onto general...")
+    assert file_bytes[ptr:ptr+14] == b'\x00\x00\x00\x0a\xa9#general#', "Could not find #general# in file"
+    ptr += 14
+    general, ptr = read_general(file_bytes, ptr)
+    logging.info("FOUND GENERAL: %s", general.__dict__)
+    for obj in general.__dict__.values():
+        logging.info("Found object: %s", obj.__dict__)
+    print_dash_line()
+    if not general:
+        logging.warning("No general found in file. This warning is only a concern if there is general in your show but none were detected.")
+
+
+
+    ## FX PALETTES ##
+    logging.info("Finished reading general. Moving onto FX palettes...")
+    assert file_bytes[ptr:ptr+17] == b'\x00\x00\x00\x0d\xac#fxpalettes#', "Could not find #fxpalettes# in file"
+    ptr += 17
+    while file_bytes[ptr:ptr+14] == b'\x00\x00\x00\x0a\xa9fxpalette':
+        ptr += 14
+        fxpalette, ptr = read_fxpalette(file_bytes, ptr)
+        fxpalettes[fxpalette.fx_palette] = fxpalette
+        logging.info("FOUND FX PALETTE: %s", fxpalette.__dict__)
+        print_dash_line()
+    if not fxpalettes:
+        logging.warning("No fx palettes found in file. This warning is only a concern if there are fx palettes in your show but none were detected.")
+
+
     # Create Lightshow object
     lightshow = Lightshow(
+        fileinfo=fileinfo,
+        models=models,
         patches=patching,
         groups=groups,
         user_palettes=user_palettes,
-        cues=cues
+        cues=cues,
+        cuelists=cuelists,
+        playbacks=playbacks,
+        fxpalettes=fxpalettes,
+        general=general
     )
     
     # Run all analysis functions if available (testing only)

@@ -1,9 +1,9 @@
 import logging
 from .attribute_parsers import (
     _read_byte_attribute, _read_boolean_attribute, _read_string_attribute,
-    _read_list_attribute, _obj_bytelength_check, _read_attribute_name, _read_obj_list_len, _read_multibyte_attribute
+    _read_list_attribute, _obj_checker, _read_attribute_name, _read_obj_list_len, _read_multibyte_attribute
 )
-from ..classes import Order, FX
+from ..classes import Patch, Group, UserPalette, Cue, Order, FX, Cuelist, Playback, General, FXPalette
 
 
 def _init_object_reading(file_bytes: bytes, ptr: int, expected_marker: bytes) -> tuple[int, int, int, int]:
@@ -63,8 +63,8 @@ def read_patch(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         logging.debug("Found attribute %s with value = %s", attr_name, patch[attr_name])
         num_attr += 1
 
-    _obj_bytelength_check(initial_ptr, ptr, patch_bytelength, num_attr, num_attr_indicated)
-    return patch, ptr
+    _obj_checker(initial_ptr, ptr, patch_bytelength, num_attr, num_attr_indicated)
+    return Patch(**patch), ptr
 
 def read_group(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     group = {}
@@ -110,8 +110,8 @@ def read_group(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         logging.debug("Found attribute %s with value = %s", attr_name, group[attr_name])
         num_attr += 1
 
-    _obj_bytelength_check(initial_ptr, ptr, group_bytelength, num_attr, num_attr_indicated)
-    return group, ptr
+    _obj_checker(initial_ptr, ptr, group_bytelength, num_attr, num_attr_indicated)
+    return Group(**group), ptr
 
 
 def read_order(file_bytes: bytes, ptr: int) -> tuple[Order, int]:
@@ -170,8 +170,8 @@ def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         logging.debug("Found attribute %s with value = %s", attr_name, palette[attr_name])
         num_attr += 1
 
-    _obj_bytelength_check(initial_ptr, ptr, palette_bytelength, num_attr, num_attr_indicated)
-    return palette, ptr
+    _obj_checker(initial_ptr, ptr, palette_bytelength, num_attr, num_attr_indicated)
+    return UserPalette(**palette), ptr
 
 def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     logging.debug("-" * 40 + " Parsing FX Layer Step " + "-" * 40)
@@ -198,7 +198,7 @@ def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
 
     assert num_attr == num_attr_indicated, "Error: number of attributes found does not match expected number of attributes for step"
     logging.debug("-" * 40 + " End FX Layer Step " + "-" * 43)
-    return step, ptr
+    return FX.FXLayerStep(**step), ptr
 
 
 def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
@@ -226,8 +226,7 @@ def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
             layer[attr_name] = []
             for _ in range(num_steps):
                 step, ptr = read_fx_layer_steps(file_bytes, ptr)
-                step_obj = FX.FXLayerStep(**step)
-                layer[attr_name].append(step_obj)
+                layer[attr_name].append(step)
 
         elif attr_name == 'ftypes':
             num_ftypes, ptr = _read_obj_list_len(file_bytes, ptr)
@@ -243,7 +242,7 @@ def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
 
     assert num_attr == num_attr_indicated, "Error: number of attributes found does not match expected number of attributes for layer"
     logging.debug("=" * 45 + " End FX Layer " + "=" * 48)
-    return layer, ptr
+    return FX.FXLayer(**layer), ptr
 
 def read_fx(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     fx = {}
@@ -280,15 +279,14 @@ def read_fx(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
             fx[attr_name] = []
             for _ in range(num_layers):
                 layer, ptr = read_fx_layer(file_bytes, ptr)
-                layer_obj = FX.FXLayer(**layer)
-                fx[attr_name].append(layer_obj)
+                fx[attr_name].append(layer)
         else:
             assert False, f"Error: Unhandled attribute '{attr_name}' in FX"
         logging.debug("Found attribute %s with value = %s", attr_name, fx[attr_name])
         num_attr += 1
 
     assert num_attr == num_attr_indicated, "Error: number of attributes does not match expected number of attributes for FX"
-    return fx, ptr
+    return FX(**fx), ptr
 
 
 def read_cue(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
@@ -311,8 +309,7 @@ def read_cue(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
             cue[attr_name] = []
             for _ in range(num_fxs):
                 fx, ptr = read_fx(file_bytes, ptr)
-                fx_obj = FX(**fx)
-                cue[attr_name].append(fx_obj)
+                cue[attr_name].append(fx)
 
         elif attr_name == 'fxs_channels':
             num_channels, ptr = _read_obj_list_len(file_bytes, ptr)
@@ -349,15 +346,211 @@ def read_cue(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         logging.debug("Found attribute %s with value = %s", attr_name, cue[attr_name])
         num_attr += 1
 
-    _obj_bytelength_check(initial_ptr, ptr, cue_bytelength, num_attr, num_attr_indicated)
-    return cue, ptr
+    _obj_checker(initial_ptr, ptr, cue_bytelength, num_attr, num_attr_indicated)
+    return Cue(**cue), ptr
+
+def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+    element = {}
+    assert file_bytes[ptr] == 0x89, "Error: Incorrect num. of attributes specified for cuelist element"
+    ptr += 1
+    attributes = ['ms_fadeout', 'cue_id', 'ms_delay', 'next', 'dotted_id', 'ms_fadein', 'ms_crossfade', 'ms_duration', 'halt']
+    num_attr = 0
+    while file_bytes[ptr] != 0x89 and num_attr < 9:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, 'cuelist_element')
+
+        if attr_name in ['cue_id', 'next']:
+            ptr = _read_byte_attribute(file_bytes, ptr, element, attr_name)
+        elif attr_name in ['halt']:
+            ptr = _read_boolean_attribute(file_bytes, ptr, element, attr_name)
+        elif attr_name in ['ms_fadeout', 'ms_delay', 'dotted_id', 'ms_fadein', 'ms_crossfade', 'ms_duration']:
+            ptr = _read_multibyte_attribute(file_bytes, ptr, element, attr_name)
+        else:
+            assert False, f"Error: This error shouldnt occur... (cuelist_element)"
+        logging.debug("Found attribute %s with value = %s", attr_name, element[attr_name])
+        num_attr += 1
+
+    missing = [attr for attr in attributes if attr not in element]
+    assert not missing, f"Error: Missing or None values for attributes: {missing}"
+    assert num_attr == 9, "Error: number of attributes found does not match expected number of attributes for cuelist element"
+
+    return Cuelist.CuelistElement(**element), ptr
 
 
 def read_cuelist(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     cuelist = {}
+    '''
+    byte: loops, visual_id, flash_mode, cuelist_id, 
+    multibyte: ms_flash_attack, ms_chase_time, bpm_chase, ms_flash_decay, pcrossfade, ms_fadeout, ms_fadein, ms_crossfade, ms_flash_hold, ms_stop_time
+    string: name
+    boolean: autoreset, at_end_pause, chase, at_end_stop, no_first_fade, block_fx, 
+    list:
+
+    others: cuelist_elements: {ms_fadeout, cue_id, ms_delay, next, dotted_id, ms_fadein, ms_crossfade, ms_duration, halt},
+
+    ms_flash_attack, autoreset, at_end_pause, loops, chase, ms_chase_time, visual_id, bpm_chase, ms_flash_decay, pcrossfade, ms_fadeout, direction, at_end_stop, flash_mode, cuelist_id, ms_fadein, ms_crossfade, no_first_fade, name, block_fx,
+    cuelist_elements: {ms_fadeout, cue_id, ms_delay, next, dotted_id, ms_fadein, ms_crossfade, ms_duration, halt},
+    ms_flash_hold, ms_stop_time
+    '''
+
+    cuelist_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr, b'\xde\x00\x17')
+    attributes = ['ms_flash_attack', 'autoreset', 'at_end_pause', 'loops', 'chase', 'ms_chase_time', 'visual_id', 'bpm_chase', 'ms_flash_decay', 'pcrossfade', 'ms_fadeout', 'direction', 'at_end_stop', 'flash_mode', 'cuelist_id', 'ms_fadein', 'ms_crossfade', 'no_first_fade', 'name', 'block_fx', 'cuelist_elements', 'ms_flash_hold', 'ms_stop_time']
+    
+    num_attr = 0
+    while file_bytes[ptr] != 0x00:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, 'cuelist')
+        
+        # Handle different attribute types
+        if attr_name in ['loops', 'visual_id', 'flash_mode', 'cuelist_id']:
+            ptr = _read_byte_attribute(file_bytes, ptr, cuelist, attr_name)
+        elif attr_name in ['autoreset', 'at_end_pause', 'chase', 'at_end_stop', 'no_first_fade', 'block_fx']:
+            ptr = _read_boolean_attribute(file_bytes, ptr, cuelist, attr_name)
+        elif attr_name == 'name':
+            ptr = _read_string_attribute(file_bytes, ptr, cuelist, attr_name)
+        elif attr_name in ['ms_flash_attack', 'ms_chase_time', 'bpm_chase', 'ms_flash_decay', 'pcrossfade', 'ms_fadeout', 'ms_fadein', 'ms_crossfade', 'ms_flash_hold', 'ms_stop_time', 'direction']:
+            ptr = _read_multibyte_attribute(file_bytes, ptr, cuelist, attr_name)
+        elif attr_name == 'cuelist_elements':
+            num_elements, ptr = _read_obj_list_len(file_bytes, ptr)
+            cuelist[attr_name] = []
+            for _ in range(num_elements):
+                element, ptr = read_cuelist_element(file_bytes, ptr)
+                cuelist[attr_name].append(element)
+        else:
+            assert False, f"Error: This error shouldnt occur... (cuelist)"
+        logging.debug("Found attribute %s with value = %s", attr_name, cuelist[attr_name])
+        num_attr += 1
+
+    _obj_checker(initial_ptr, ptr, cuelist_bytelength, num_attr, num_attr_indicated)
+    return Cuelist(**cuelist), ptr
     
 def read_playback(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+    '''
+    byte: fader_value, index, priority, trigger_level, page, cuelist
+    multibyte: fader_mode, ms_chase_time, bpm_chase, pcrossfade, ms_fadeout, ms_fadein, ms_crossfade, 
+    string:
+    boolean: on_load_play, chase, fader_up_play, on_page_stop, is_executor, fader_down_stop, on_page_play, docked
+    list: xct_color, xct_push_mode, xct_cuelist, 
+
+    fader_value, on_load_play, fader_mode, chase, index, ms_chase_time, fader_up_play, priority, bpm_chase, on_page_stop, trigger_level, is_executor, pcrossfade, ms_fadeout, fader_down_stop, ms_fadein, ms_crossfade, on_page_play, xct_color, cuelist, xct_push_mode,  docked, xct_cuelist, page
+    '''
+    
     playback = {}
+    playback_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr, b'\xde\x00\x18')
+    attributes = ['fader_value', 'on_load_play', 'fader_mode', 'chase', 'index', 'ms_chase_time', 'fader_up_play', 'priority', 'bpm_chase', 'on_page_stop', 'trigger_level', 'is_executor', 'pcrossfade', 'ms_fadeout', 'fader_down_stop', 'ms_fadein', 'ms_crossfade', 'on_page_play', 'xct_color', 'cuelist', 'xct_push_mode', 'docked', 'xct_cuelist', 'page']
+    num_attr = 0
+    while file_bytes[ptr] != 0x00:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, 'playback')
+        
+        # Byte attributes
+        if attr_name in ['fader_value', 'index', 'priority', 'trigger_level', 'cuelist', 'page']:
+            ptr = _read_byte_attribute(file_bytes, ptr, playback, attr_name)
+        elif attr_name in ['fader_mode', 'ms_chase_time', 'bpm_chase', 'pcrossfade', 'ms_fadeout', 'ms_fadein', 'ms_crossfade']:
+            ptr = _read_multibyte_attribute(file_bytes, ptr, playback, attr_name)
+        elif attr_name in ['on_load_play', 'chase', 'fader_up_play', 'on_page_stop', 'is_executor', 'fader_down_stop', 'on_page_play', 'docked']:
+            ptr = _read_boolean_attribute(file_bytes, ptr, playback, attr_name)
+        elif attr_name == 'xct_push_mode':
+            ptr = _read_list_attribute(file_bytes, ptr, playback, attr_name, attribute_type="bool")
+        elif attr_name in ['xct_color', 'xct_cuelist']:
+            ptr = _read_list_attribute(file_bytes, ptr, playback, attr_name)
+        else:
+            assert False, f"Error: This error shouldnt occur... (playback)"
+            
+        logging.debug("Found attribute %s with value = %s", attr_name, playback[attr_name])
+        num_attr += 1
+
+    _obj_checker(initial_ptr, ptr, playback_bytelength, num_attr, num_attr_indicated)
+    return Playback(**playback), ptr
+
+def read_config(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+    config = {}
+    assert file_bytes[ptr:ptr+11] == b'\x00\x00\x00\x07\xa6config', "Error: Could not find config in file"
+    ptr += 11
+    config_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr, b'\x87')
+    attributes = ['update_mode', 'executors_exclusive_mode', 'remove_non_empty_cuelist', 'clear_ltp', 'bpm_mode', 'show_password', 'show_password_enabled']
+     
+    num_attr = 0
+    while file_bytes[ptr] != 0x00:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, 'config')
+        
+        if attr_name in ['update_mode']:
+            ptr = _read_byte_attribute(file_bytes, ptr, config, attr_name)
+        elif attr_name in ['executors_exclusive_mode', 'remove_non_empty_cuelist', 'clear_ltp', 'bpm_mode', 'show_password_enabled']:
+            ptr = _read_boolean_attribute(file_bytes, ptr, config, attr_name)
+        elif attr_name in ['show_password']:
+            ptr = _read_string_attribute(file_bytes, ptr, config, attr_name)
+        else:
+            assert False, f"Error: This error shouldnt occur... (config)"
+            
+        logging.debug("Found attribute %s with value = %s", attr_name, config[attr_name])
+        num_attr += 1
+    
+    _obj_checker(initial_ptr, ptr, config_bytelength, num_attr, num_attr_indicated)
+    return General.Config(**config), ptr
 
 def read_general(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+    # Will add more attributes if I find more
     general = {}
+    config, ptr = read_config(file_bytes, ptr)
+    general['config'] = config
+    return General(**general), ptr
+
+
+def read_fxpalette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+    fxpalette = {}
+    fxpalette_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr, b'\x87')
+    attributes = ['fx_palette', 'cue_id', 'visual_id', 'fxs', 'fxs_channels', 'orders', 'name']
+    num_attr = 0
+    while file_bytes[ptr] != 0x00:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, 'cue')
+
+        if attr_name in ['fx_palette', 'cue_id', 'visualid']:
+            ptr = _read_byte_attribute(file_bytes, ptr, fxpalette, attr_name)
+        elif attr_name in ['visual_id']:
+            ptr = _read_multibyte_attribute(file_bytes, ptr, fxpalette, attr_name)
+        elif attr_name in ['name']:
+            ptr = _read_string_attribute(file_bytes, ptr, fxpalette, attr_name)
+
+        elif attr_name == 'fxs':
+            num_fxs, ptr = _read_obj_list_len(file_bytes, ptr)
+            fxpalette[attr_name] = []
+            for _ in range(num_fxs):
+                fx, ptr = read_fx(file_bytes, ptr)
+                fxpalette[attr_name].append(fx)
+
+        elif attr_name == 'fxs_channels':
+            num_channels, ptr = _read_obj_list_len(file_bytes, ptr)
+            fxpalette[attr_name] = []
+            for _ in range(num_channels):
+                channel_len, ptr = _read_obj_list_len(file_bytes, ptr)
+                channel = []
+                i = 0
+                # NOTE: some of the channel instances have:
+                # \xD1 FF at the 11th channel's index and it doesn't count towards the channel_len for some reason?
+                # \xCD multibyte values (these count towards channel_len)
+                # will fix once I figure this out
+                while i < channel_len:
+                    # probably deleted? idk
+                    if file_bytes[ptr:ptr+2] == b'\xd1\xff':
+                        channel.append(file_bytes[ptr:ptr+2])
+                        ptr += 2
+                    else:
+                        temp = {}
+                        ptr = _read_multibyte_attribute(file_bytes, ptr, temp, 'channel')
+                        channel.append(temp['channel'])
+                        i += 1
+                fxpalette[attr_name].append(channel)
+
+        elif attr_name == 'orders':
+            num_orders, ptr = _read_obj_list_len(file_bytes, ptr)
+            logging.debug("Number of orders: %d", num_orders)
+            fxpalette[attr_name] = []
+            for _ in range(num_orders):
+                order_obj, ptr = read_order(file_bytes, ptr)
+                fxpalette[attr_name].append(order_obj)  
+        else:
+            assert False, f"Error: This error shouldnt occur... (fxpalette)"
+        logging.debug("Found attribute %s with value = %s", attr_name, fxpalette[attr_name])
+        num_attr += 1
+
+    _obj_checker(initial_ptr, ptr, fxpalette_bytelength, num_attr, num_attr_indicated)
+    return FXPalette(**fxpalette), ptr
+    
