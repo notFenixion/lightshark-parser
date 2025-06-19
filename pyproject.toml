@@ -20,3 +20,6 @@ lightshark-parser = "lightshark_parser.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.ruff]
+line-length = 140

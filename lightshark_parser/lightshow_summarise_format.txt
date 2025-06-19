@@ -1,0 +1,111 @@
+=== SHOW INFO ===
+
+File name: ______.lshw
+Date parsed: __/__/____
+Creation Date:
+Last Modified: __/__/____
+
+Fixtures: __ (count)
+Cues: __ (count)
+Cuelists: __ (count)
+
+
+===== FIXTURES =====
+[name] (IDs: [id1], [id2], ...):
+    universe: __
+    inverse_tilt: True/False
+    inverse_pan: True/False
+    type: (map ftypes to Intensity, Pan, Tilt, Color [rgb?rgba?] etc.)
+...
+
+===== GROUPS =====
+[description]  (ID: [group_id]) (AUTO-GENERATED)
+    Fixtures: [patched_elements_ids]
+
+
+===== PALETTES =====
+[name]: (ID [user_palette_id])
+    Section: (section)
+    Orders:
+        [patch name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
+        [patch name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
+        ...
+...
+
+
+===== CUELISTS =====
+[name]: (ID [cue_id])
+    Cuelist Settings:
+        Deactivate after last cue: True/False (at_end_stop)
+        Deactivate resets to first cue: True/False (autoreset)
+        Halt last cue: True/False (at_end_pause)
+        Block FX: True/False (block_fx)
+        Deactivate Time: __ms (ms_stop_time)
+        
+    Chase:
+        (if chase is true) {
+            Chase Time: __ms (ms_chase_time)
+            Chase Speed: __ bpm (bpm_chase)
+            Crossfade %: __% (pcrossfade)
+            Loops: __ (loops)
+            Direction: (map this)
+        }
+
+    Cues:
+        [dottedid]: (cue name) | Wait: __ms/halt| Crossfade: | Fade In: | Fade Out: | Next Cue: (next_cue_dottedid)
+....
+
+
+===== CUES =====
+    [name] (ID: [id])
+    Fixtures:
+        [palette_name] (id): (patchids)
+        [palette_name] (id): (patchids)
+
+        Non-palettes:
+        [patch_name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
+        ...
+    
+    FXs:
+        [fxpalette_name] (id): (patchids)
+        [fxpalette_name] (id): (patchids)
+
+        Non-fxpalettes:
+        same representation as fx palettes from below
+
+
+===== FXPALETTES =====
+
+[fxpalette_id]:
+    FX (gfxid):
+        Patches: (list of patches)
+        Direction: (map direction to smth)
+        Split: (split)
+        Repeats: (repeats)
+        Speed: (speed if not bpm) (bpm if bpm)
+        Width: (width)%
+        Phase/Spread: (spread)
+        Offset: (offset)
+        Basic: True (fx_ref mapping)
+
+        (if not basic):
+        Advanced FX Layers:
+        (id): (ftypes) 
+            Layer Offset: (phase_offset)
+            Size: (size)
+            Blind: (blind)
+            (step_name):
+                Start Point: (sum of prev ancho)/1024*360
+                Start Limit: (start_limit)
+                End Limit: (end_limit)
+                Curve Type: (curve_type)
+                Curve Parameters:
+                    Start Point: (inicio) [NOTE: unused for most curve types]
+                    In - (curve_in)
+                    Out - (curve_out)
+                    Strength - (strength) [NOTE: unused for most curve types]
+                    Jumps - (jumps) [NOTE: unused for most curve types]
+            ...
+        ...
+    ...
+...

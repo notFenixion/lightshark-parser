@@ -1,12 +1,24 @@
-import orjson
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
+
 
 class Lightshow:
-    def __init__(self, fileinfo: Dict = None, models: Dict = None, patches: Dict[Any, 'Patch'] = None, groups: Dict[Any, 'Group'] = None, user_palettes: Dict = None, cues: Dict = None, cuelists: Dict = None, playbacks: Dict = None, fxpalettes: Dict = None, general: Dict = None):
+    def __init__(
+        self,
+        fileinfo: Dict = None,
+        models: Dict = None,
+        patches: Dict[Any, "Patch"] = None,
+        groups: Dict[Any, "Group"] = None,
+        user_palettes: Dict = None,
+        cues: Dict = None,
+        cuelists: Dict = None,
+        playbacks: Dict = None,
+        fxpalettes: Dict = None,
+        general: Dict = None,
+    ):
         self._fileinfo: Dict = fileinfo if fileinfo is not None else {}
         self._models: Dict[Any, Any] = models if models is not None else {}
-        self._patches: Dict[Any, 'Patch'] = patches if patches is not None else {}
-        self._groups: Dict[Any, 'Group'] = groups if groups is not None else {}
+        self._patches: Dict[Any, "Patch"] = patches if patches is not None else {}
+        self._groups: Dict[Any, "Group"] = groups if groups is not None else {}
         self._user_palettes: Dict = user_palettes if user_palettes is not None else {}
         self._cues: Dict = cues if cues is not None else {}
         self._cuelists: Dict = cuelists if cuelists is not None else {}
@@ -14,51 +26,151 @@ class Lightshow:
         self._fxpalettes: Dict = fxpalettes if fxpalettes is not None else {}
         self._general: Dict = general if general is not None else {}
 
-    def add_model(self, model: 'Model') -> None:
-        self._models[model.id] = model
-    
-    def add_patch(self, patch: 'Patch') -> None:
-        self._patches[patch.id] = patch
-
-    def add_group(self, group: 'Group') -> None:
-        self._groups[group.id] = group
-
-    def add_palette(self, palette: 'UserPalette') -> None:
-        self._user_palettes[palette.id] = palette
-
-    def add_cue(self, cue: 'Cue') -> None:
-        self._cues[cue.id] = cue
-
-    def parse_to_bytes(self) -> None:
-        pass
-
     def to_dict(self) -> Dict:
-        """Convert the Lightshow object to a dictionary for JSON serialization."""
-        # Helper function to convert objects to dicts
         def to_dict_recursive(obj):
-            if hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')):
+            if hasattr(obj, "to_dict") and callable(getattr(obj, "to_dict")):
                 return obj.to_dict()
-            elif hasattr(obj, '__dict__'):
+            elif hasattr(obj, "__dict__"):
                 return {k: to_dict_recursive(v) for k, v in obj.__dict__.items()}
             elif isinstance(obj, (list, tuple)):
                 return [to_dict_recursive(item) for item in obj]
             elif isinstance(obj, dict):
                 return {str(k): to_dict_recursive(v) for k, v in obj.items()}
             return obj
-            
+
         return {
-            'fileinfo': to_dict_recursive(self._fileinfo),
-            'models': [to_dict_recursive(model) for model in self._models.values()],
-            'patches': [to_dict_recursive(patch) for patch in self._patches.values()],
-            'groups': [to_dict_recursive(group) for group in self._groups.values()],
-            'user_palettes': {str(k): to_dict_recursive(v) for k, v in self._user_palettes.items()},
-            'cues': {str(k): to_dict_recursive(v) for k, v in self._cues.items()},
-            'cuelists': {str(k): to_dict_recursive(v) for k, v in self._cuelists.items()},
-            'playbacks': {str(k): to_dict_recursive(v) for k, v in self._playbacks.items()},
-            'fxpalettes': {str(k): to_dict_recursive(v) for k, v in self._fxpalettes.items()},
-            'general': to_dict_recursive(self._general)
+            "fileinfo": to_dict_recursive(self._fileinfo),
+            "models": [to_dict_recursive(model) for model in self._models.values()],
+            "patches": [to_dict_recursive(patch) for patch in self._patches.values()],
+            "groups": [to_dict_recursive(group) for group in self._groups.values()],
+            "user_palettes": {str(k): to_dict_recursive(v) for k, v in self._user_palettes.items()},
+            "cues": {str(k): to_dict_recursive(v) for k, v in self._cues.items()},
+            "cuelists": {str(k): to_dict_recursive(v) for k, v in self._cuelists.items()},
+            "playbacks": {str(k): to_dict_recursive(v) for k, v in self._playbacks.items()},
+            "fxpalettes": {str(k): to_dict_recursive(v) for k, v in self._fxpalettes.items()},
+            "general": to_dict_recursive(self._general),
         }
 
+    
+    def summarise(self):
+        """
+        FORMAT:
+        
+        === SHOW INFO ===
+
+        File name: ______.lshw
+        Date parsed: __/__/____
+        Creation Date:
+        Last Modified: __/__/____
+
+        Fixtures: __ (count)
+        Cues: __ (count)
+        Cuelists: __ (count)
+
+
+        ===== FIXTURES =====
+        [name] (IDs: [id1], [id2], ...):
+            universe: __
+            inverse_tilt: True/False
+            inverse_pan: True/False
+            type: (ig we can have a dict of ftypes and what they correspond to? )
+        ...
+
+        ===== GROUPS =====
+        [description]  (ID: [group_id]) (AUTO-GENERATED)
+            Fixtures: [patched_elements_ids]
+
+
+        === PALETTES ===
+        [name]: (ID [user_palette_id])
+            Section: (section)
+            Orders:
+                [patch name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
+                [patch name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
+                ...
+        ...
+
+
+        === CUELISTS ===
+        [name]: (ID [cue_id])
+            Cuelist Settings:
+                Deactivate after last cue: True/False (at_end_stop)
+                Deactivate resets to first cue: True/False (autoreset)
+                Halt last cue: True/False (at_end_pause)
+                Block FX: True/False (block_fx)
+                Deactivate Time: __ms (ms_stop_time)
+                
+            Chase:
+                (if chase is true) {
+                    Chase Time: __ms (ms_chase_time)
+                    Chase Speed: __ bpm (bpm_chase)
+                    Crossfade %: __% (pcrossfade)
+                    Loops: __ (loops)
+                    Direction: (map this)
+                }
+
+            Cues:
+                [dottedid]: (cue name) | Wait: __ms/halt| Crossfade: | Fade In: | Fade Out: | Next Cue: (next_cue_dottedid)
+        ....
+
+
+        === CUES ===
+            [name] (ID: [id])
+            Fixtures:
+                [palette_name] (id): (patchids)
+                [palette_name] (id): (patchids)
+
+                Non-palettes:
+                [patch_name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
+                ...
+            
+            FXs:
+                [fxpalette_name] (id): (patchids)
+                [fxpalette_name] (id): (patchids)
+
+                Non-fxpalettes:
+                same representation as fx palettes from below
+
+        
+        --- FX PALETTES---
+
+        [fxpalette_id]:
+            FX (gfxid):
+                Patches: (list of patches)
+                Direction: (map direction to smth)
+                Split: (split)
+                Repeats: (repeats)
+                Speed: (speed if not bpm) (bpm if bpm)
+                Width: (width)%
+                Phase/Spread: (spread)
+                Offset: (offset)
+                Basic: True (fx_ref mapping)
+
+                (if not basic):
+                Advanced FX Layers:
+                (id): (ftypes) 
+                    Layer Offset: (phase_offset)
+                    Size: (size)
+                    Blind: (blind)
+                    (step_name):
+                        Start Point: (sum of prev ancho)/1024*360
+                        Start Limit: (start_limit)
+                        End Limit: (end_limit)
+                        Curve Type: (curve_type)
+                        Curve Parameters:
+                            Start Point: (inicio) [NOTE: unused for most curve types]
+                            In - (curve_in)
+                            Out - (curve_out)
+                            Strength - (strength) [NOTE: unused for most curve types]
+                            Jumps - (jumps) [NOTE: unused for most curve types]
+                    ...
+                ...
+            ...
+        ...
+
+
+        END
+        """
 
 
 class Model:
@@ -66,8 +178,28 @@ class Model:
         self.model_id: int = model_id
         self.palettes: List[Any] = []
 
+
 class Patch:
-    def __init__(self, model_id: Optional[int] = None, inverse_tilt: Optional[bool] = None, name: Optional[str] = None, channels_ftype: Optional[List[str]] = None, index: Optional[int] = None, universe: Optional[int] = None, description: Optional[str] = None, inverse_pan: Optional[bool] = None, visual_id: Optional[int] = None, parked: Optional[bool] = None, color_mark: Optional[int] = None, dimmer: Optional[List[int]] = None, swap_pan_tilt: Optional[bool] = None, virtual_dimmer: Optional[List[int]] = None, id: Optional[int] = None, size: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        model_id: Optional[int] = None,
+        inverse_tilt: Optional[bool] = None,
+        name: Optional[str] = None,
+        channels_ftype: Optional[List[str]] = None,
+        index: Optional[int] = None,
+        universe: Optional[int] = None,
+        description: Optional[str] = None,
+        inverse_pan: Optional[bool] = None,
+        visual_id: Optional[int] = None,
+        parked: Optional[bool] = None,
+        color_mark: Optional[int] = None,
+        dimmer: Optional[List[int]] = None,
+        swap_pan_tilt: Optional[bool] = None,
+        virtual_dimmer: Optional[List[int]] = None,
+        id: Optional[int] = None,
+        size: Optional[int] = None,
+        frozen: Optional[int] = None,
+    ) -> None:
         self.model_id: Optional[int] = model_id
         self.inverse_tilt: Optional[bool] = inverse_tilt
         self.name: Optional[str] = name
@@ -84,88 +216,98 @@ class Patch:
         self.virtual_dimmer: List[int] = virtual_dimmer if virtual_dimmer is not None else []
         self.id: Optional[int] = id
         self.size: Optional[int] = size
+        self.frozen: Optional[int] = frozen
 
     def to_dict(self) -> dict:
-        """Convert the Patch object to a dictionary for JSON serialization."""
         return {
-            'model_id': self.model_id,
-            'inverse_tilt': self.inverse_tilt,
-            'name': self.name,
-            'channels_ftype': self.channels_ftype,
-            'index': self.index,
-            'universe': self.universe,
-            'description': self.description,
-            'inverse_pan': self.inverse_pan,
-            'visual_id': self.visual_id,
-            'parked': self.parked,
-            'color_mark': self.color_mark,
-            'dimmer': self.dimmer,
-            'swap_pan_tilt': self.swap_pan_tilt,
-            'virtual_dimmer': self.virtual_dimmer,
-            'id': self.id,
-            'size': self.size
+            "model_id": self.model_id,
+            "inverse_tilt": self.inverse_tilt,
+            "name": self.name,
+            "channels_ftype": self.channels_ftype,
+            "index": self.index,
+            "universe": self.universe,
+            "description": self.description,
+            "inverse_pan": self.inverse_pan,
+            "visual_id": self.visual_id,
+            "parked": self.parked,
+            "color_mark": self.color_mark,
+            "dimmer": self.dimmer,
+            "swap_pan_tilt": self.swap_pan_tilt,
+            "virtual_dimmer": self.virtual_dimmer,
+            "id": self.id,
+            "size": self.size,
+            "frozen": self.frozen,
         }
 
 
 class Group:
-    def __init__(self, description: Optional[str] = None, color_mark: Optional[int] = None, visual_id: Optional[int] = None, patched_elements_ids: Optional[List[int]] = None, grid: Optional[Dict[int, Tuple[int, int]]] = None, steps: Optional[Dict[int, int]] = None, automatico: Optional[bool] = None, group_id: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        description: Optional[str] = None,
+        color_mark: Optional[int] = None,
+        visual_id: Optional[int] = None,
+        patched_elements_ids: Optional[List[int]] = None,
+        grid: Optional[Dict[int, List[int]]] = None,
+        steps: Optional[Dict[int, int]] = None,
+        automatico: Optional[bool] = None,
+        group_id: Optional[int] = None,
+    ) -> None:
         self.description: Optional[str] = description
         self.color_mark: Optional[int] = color_mark
         self.visual_id: Optional[int] = visual_id
         self.patched_elements_ids: List[int] = patched_elements_ids if patched_elements_ids is not None else []
-        self.grid: Dict[int, Tuple[int, int]] = grid if grid is not None else {}
+        self.grid: Dict[int, List[int]] = grid if grid is not None else {}
         self.steps: Dict[int, int] = steps if steps is not None else {}
         self.automatico: Optional[bool] = automatico
         self.group_id: Optional[int] = group_id
 
     def to_dict(self) -> dict:
-        """Convert the Group object to a dictionary for JSON serialization."""
-        # Convert grid tuples to lists for JSON serialization
-        grid_dict = {}
-        for k, v in self.grid.items():
-            if isinstance(v, tuple):
-                grid_dict[str(k)] = list(v)
-            else:
-                grid_dict[str(k)] = v
-                
-        # Convert steps keys to strings
-        steps_dict = {str(k): v for k, v in self.steps.items()}
-        
         return {
-            'description': self.description,
-            'color_mark': self.color_mark,
-            'visual_id': self.visual_id,
-            'patched_elements_ids': self.patched_elements_ids,
-            'grid': grid_dict,
-            'steps': steps_dict,
-            'automatico': self.automatico,
-            'group_id': self.group_id
+            "description": self.description,
+            "color_mark": self.color_mark,
+            "visual_id": self.visual_id,
+            "patched_elements_ids": self.patched_elements_ids,
+            "grid": {str(k): v for k, v in self.grid.items()},
+            "steps": {str(k): v for k, v in self.steps.items()},
+            "automatico": self.automatico,
+            "group_id": self.group_id,
         }
 
 
 class UserPalette:
-    def __init__(self, section: int = None, user_palette_id: int = None, name: str = None, orders: Optional[List['Order']] = None) -> None:
+    def __init__(
+        self,
+        section: int = None,
+        user_palette_id: int = None,
+        name: str = None,
+        orders: Optional[List["Order"]] = None,
+    ) -> None:
         self.section: int = section
         self.user_palette_id: int = user_palette_id
         self.name: str = name
-        self.orders: List['Order'] = orders if orders is not None else []
-    
+        self.orders: List["Order"] = orders if orders is not None else []
+
     def to_dict(self) -> dict:
-        """Convert the UserPalette object to a dictionary for JSON serialization."""
         return {
-            'section': self.section,
-            'user_palette_id': self.user_palette_id,
-            'name': self.name,
-            'orders': [
-                order.to_dict() if hasattr(order, 'to_dict') else order
-                for order in self.orders
-            ]
+            "section": self.section,
+            "user_palette_id": self.user_palette_id,
+            "name": self.name,
+            "orders": [order.to_dict() if hasattr(order, "to_dict") else order for order in self.orders],
         }
 
+
 class Order:
-    def __init__(self, palette_id: int = None, universe: int = None, section: int = None, 
-                 receptor_type: int = None, patch_id: int = None, ftype: str = None, 
-                 value: int = None, channel: int = None) -> None:
+    def __init__(
+        self,
+        palette_id: int = None,
+        universe: int = None,
+        section: int = None,
+        receptor_type: int = None,
+        patch_id: int = None,
+        ftype: str = None,
+        value: int = None,
+        channel: int = None,
+    ) -> None:
         self.palette_id: int = palette_id
         self.universe: int = universe
         self.section: int = section
@@ -176,119 +318,139 @@ class Order:
         self.channel: int = channel
 
     def to_dict(self) -> dict:
-        """Convert the Order object to a dictionary for JSON serialization."""
         return {
-            'palette_id': self.palette_id,
-            'universe': self.universe,
-            'section': self.section,
-            'receptor_type': self.receptor_type,
-            'patch_id': self.patch_id,
-            'ftype': self.ftype,
-            'value': self.value,
-            'channel': self.channel
+            "palette_id": self.palette_id,
+            "universe": self.universe,
+            "section": self.section,
+            "receptor_type": self.receptor_type,
+            "patch_id": self.patch_id,
+            "ftype": self.ftype,
+            "value": self.value,
+            "channel": self.channel,
         }
 
 
 class Cue:
-    def __init__(self, fx_palette: int = None, cue_id: int = None, visual_id: int = None, 
-                 fxs: List['FX'] = None, fxs_channels: List[dict] = None, 
-                 orders: List[Order] = None, name: str = None) -> None:
+    def __init__(
+        self,
+        fx_palette: int = None,
+        cue_id: int = None,
+        visual_id: int = None,
+        fxs: List["FX"] = None,
+        fxs_channels: List[dict] = None,
+        orders: List[Order] = None,
+        name: str = None,
+    ) -> None:
         self.fx_palette: int = fx_palette
         self.cue_id: int = cue_id
         self.visual_id: int = visual_id
-        self.fxs: List['FX'] = fxs if fxs is not None else []
+        self.fxs: List["FX"] = fxs if fxs is not None else []
         self.fxs_channels: List[dict] = fxs_channels if fxs_channels is not None else []
         self.orders: List[Order] = orders if orders is not None else []
         self.name: str = name
-        
+
     def to_dict(self) -> dict:
-        """Convert the Cue object to a dictionary for JSON serialization."""
-        # Helper function to convert bytes to Unicode escape sequences in nested structures
         def convert_bytes(obj):
             if isinstance(obj, bytes):
                 # Convert bytes to a string of Unicode escape sequences (e.g., b'\x02\x04' -> '\\u0002\\u0004')
-                return ''.join(f'\\u{byte:04x}' for byte in obj)
+                return "".join(f"\\u{byte:04x}" for byte in obj)
             elif isinstance(obj, dict):
                 return {str(k): convert_bytes(v) for k, v in obj.items()}
             elif isinstance(obj, (list, tuple)):
                 return [convert_bytes(item) for item in obj]
             return obj
-            
-        # Convert fxs_channels to ensure all bytes are converted to Unicode escape sequences
+
         converted_fxs_channels = convert_bytes(self.fxs_channels)
-        
-        # Convert fxs list
         fxs_list = []
         for fx in self.fxs:
-            if hasattr(fx, 'to_dict'):
+            if hasattr(fx, "to_dict"):
                 fxs_list.append(fx.to_dict())
-            elif hasattr(fx, '__dict__'):
+            elif hasattr(fx, "__dict__"):
                 fxs_list.append(fx.__dict__)
             else:
                 fxs_list.append(fx)
-        
+
         # Convert orders
         orders_list = []
         for order in self.orders:
-            if hasattr(order, 'to_dict'):
+            if hasattr(order, "to_dict"):
                 orders_list.append(order.to_dict())
-            elif hasattr(order, '__dict__'):
+            elif hasattr(order, "__dict__"):
                 orders_list.append(order.__dict__)
             else:
                 orders_list.append(order)
-        
+
         return {
-            'fx_palette': self.fx_palette,
-            'cue_id': self.cue_id,
-            'visual_id': self.visual_id,
-            'fxs': fxs_list if self.fxs else None,  # Set to None if empty list
-            'fxs_channels': converted_fxs_channels,
-            'orders': orders_list,
-            'name': self.name
+            "fx_palette": self.fx_palette,
+            "cue_id": self.cue_id,
+            "visual_id": self.visual_id,
+            "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
+            "fxs_channels": converted_fxs_channels,
+            "orders": orders_list,
+            "name": self.name,
         }
+    
 
 
 class FX:
     class FXLayer:
-        def __init__(self, blind: bool = None, phase_offset: int = None, section: int = None, 
-                    curve: int = None, steps: List['FX.FXLayerSteps'] = None, 
-                    ftypes: List[str] = None, id: int = None, size: int = None) -> None:
+        def __init__(
+            self,
+            blind: bool = None,
+            phase_offset: int = None,
+            section: int = None,
+            curve: int = None,
+            steps: List["FX.FXLayerSteps"] = None,
+            ftypes: List[str] = None,
+            id: int = None,
+            size: int = None,
+        ) -> None:
             self.blind: bool = blind
             self.phase_offset: int = phase_offset
             self.section: int = section
             self.curve: int = curve
-            self.steps: List['FX.FXLayerSteps'] = steps if steps is not None else []
+            self.steps: List["FX.FXLayerSteps"] = steps if steps is not None else []
             self.ftypes: List[str] = ftypes if ftypes is not None else []
             self.id: int = id
             self.size: int = size
-            
+
         def to_dict(self) -> dict:
-            # Convert steps to their dictionary representation
             steps_list = []
             for step in self.steps:
-                if hasattr(step, 'to_dict'):
+                if hasattr(step, "to_dict"):
                     steps_list.append(step.to_dict())
-                elif hasattr(step, '__dict__'):
+                elif hasattr(step, "__dict__"):
                     steps_list.append(step.__dict__)
                 else:
                     steps_list.append(step)
-                    
+
             return {
-                'blind': self.blind,
-                'phase_offset': self.phase_offset,
-                'section': self.section,
-                'curve': self.curve,
-                'steps': steps_list,
-                'ftypes': self.ftypes,
-                'id': self.id,
-                'size': self.size
+                "blind": self.blind,
+                "phase_offset": self.phase_offset,
+                "section": self.section,
+                "curve": self.curve,
+                "steps": steps_list,
+                "ftypes": self.ftypes,
+                "id": self.id,
+                "size": self.size,
             }
-    
+
     class FXLayerStep:
-        def __init__(self, start_limit: int = None, palette_type: int = None, name: str = None, 
-                    ancho: int = None, curve_in: int = None, curve_out: int = None, 
-                    strength: int = None, curve_type: int = None, palette_value: Any = None, 
-                    inicio: int = None, end_limit: int = None, jumps: int = None) -> None:
+        def __init__(
+            self,
+            start_limit: int = None,
+            palette_type: int = None,
+            name: str = None,
+            ancho: int = None,
+            curve_in: int = None,
+            curve_out: int = None,
+            strength: int = None,
+            curve_type: int = None,
+            palette_value: Any = None,
+            inicio: int = None,
+            end_limit: int = None,
+            jumps: int = None,
+        ) -> None:
             self.start_limit: int = start_limit
             self.palette_type: int = palette_type
             self.name: str = name
@@ -297,41 +459,54 @@ class FX:
             self.curve_out: int = curve_out
             self.strength: int = strength
             self.curve_type: int = curve_type
-            self.palette_value: Any = palette_value  # Could be multi-value
+            self.palette_value: Any = palette_value
             self.inicio: int = inicio
             self.end_limit: int = end_limit
             self.jumps: int = jumps
-            
+
         def to_dict(self) -> dict:
-            # Convert palette_value if it's a complex object
-            palette_value = self.palette_value
-            if hasattr(palette_value, 'to_dict'):
-                palette_value = palette_value.to_dict()
-            elif hasattr(palette_value, '__dict__'):
-                palette_value = palette_value.__dict__
-                
             return {
-                'start_limit': self.start_limit,
-                'palette_type': self.palette_type,
-                'name': self.name,
-                'ancho': self.ancho,
-                'curve_in': self.curve_in,
-                'curve_out': self.curve_out,
-                'strength': self.strength,
-                'curve_type': self.curve_type,
-                'palette_value': palette_value,
-                'inicio': self.inicio,
-                'end_limit': self.end_limit,
-                'jumps': self.jumps
+                "start_limit": self.start_limit,
+                "palette_type": self.palette_type,
+                "name": self.name,
+                "ancho": self.ancho,
+                "curve_in": self.curve_in,
+                "curve_out": self.curve_out,
+                "strength": self.strength,
+                "curve_type": self.curve_type,
+                "palette_value": palette_value,
+                "inicio": self.inicio,
+                "end_limit": self.end_limit,
+                "jumps": self.jumps,
             }
-    
-    def __init__(self, cyclos: int = None, direction: int = None, speed: int = None, group_steps: int = None, 
-                 size: int = None, layers: List[FXLayer] = None, patches: List[int] = None, 
-                 speed_in_bpm: bool = None, width: int = None, spread: int = None, basic: bool = None, 
-                 gfxid: int = None, internal_speed: int = None, fx_ref: int = None, splits: int = None, 
-                 groups: List[int] = None, rect_width: int = None, name: str = None, 
-                 phase_offset: int = None, bpm: int = None, render_id: int = None, 
-                 mode: int = None, repeats: int = None, rect_height: int = None) -> None:
+
+    def __init__(
+        self,
+        cyclos: int = None,
+        direction: int = None,
+        speed: int = None,
+        group_steps: int = None,
+        size: int = None,
+        layers: List[FXLayer] = None,
+        patches: List[int] = None,
+        speed_in_bpm: bool = None,
+        width: int = None,
+        spread: int = None,
+        basic: bool = None,
+        gfxid: int = None,
+        internal_speed: int = None,
+        fx_ref: int = None,
+        splits: int = None,
+        groups: List[int] = None,
+        rect_width: int = None,
+        name: str = None,
+        phase_offset: int = None,
+        bpm: int = None,
+        render_id: int = None,
+        mode: int = None,
+        repeats: int = None,
+        rect_height: int = None,
+    ) -> None:
         # Single byte attributes
         self.cyclos: int = cyclos
         self.direction: int = direction
@@ -360,62 +535,60 @@ class FX:
         # List attributes
         self.patches: List[int] = patches if patches is not None else []
         self.groups: List[int] = groups if groups is not None else []
-        
+
         # Object attributes
         self.layers: List[FX.FXLayer] = layers if layers is not None else []
-        
+
     def to_dict(self) -> dict:
         """Convert the FX object to a dictionary for JSON serialization."""
         # Convert layers to their dictionary representation
         layers_list = []
         for layer in self.layers:
-            if hasattr(layer, 'to_dict'):
+            if hasattr(layer, "to_dict"):
                 layers_list.append(layer.to_dict())
-            elif hasattr(layer, '__dict__'):
+            elif hasattr(layer, "__dict__"):
                 layers_list.append(layer.__dict__)
             else:
                 layers_list.append(layer)
-                
+
         return {
             # Single byte attributes
-            'cyclos': self.cyclos,
-            'direction': self.direction,
-            'group_steps': self.group_steps,
-            'gfxid': self.gfxid,
-            'splits': self.splits,
-            'rect_width': self.rect_width,
-            'render_id': self.render_id,
-            'mode': self.mode,
-            'repeats': self.repeats,
-            'rect_height': self.rect_height,
+            "cyclos": self.cyclos,
+            "direction": self.direction,
+            "group_steps": self.group_steps,
+            "gfxid": self.gfxid,
+            "splits": self.splits,
+            "rect_width": self.rect_width,
+            "render_id": self.render_id,
+            "mode": self.mode,
+            "repeats": self.repeats,
+            "rect_height": self.rect_height,
             # Multibyte attributes
-            'speed': self.speed,
-            'size': self.size,
-            'width': self.width,
-            'spread': self.spread,
-            'internal_speed': self.internal_speed,
-            'fx_ref': self.fx_ref,
-            'phase_offset': self.phase_offset,
-            'bpm': self.bpm,
+            "speed": self.speed,
+            "size": self.size,
+            "width": self.width,
+            "spread": self.spread,
+            "internal_speed": self.internal_speed,
+            "fx_ref": self.fx_ref,
+            "phase_offset": self.phase_offset,
+            "bpm": self.bpm,
             # String attribute
-            'name': self.name,
+            "name": self.name,
             # Boolean attributes
-            'speed_in_bpm': self.speed_in_bpm,
-            'basic': self.basic,
+            "speed_in_bpm": self.speed_in_bpm,
+            "basic": self.basic,
             # List attributes
-            'patches': self.patches,
-            'groups': self.groups,
+            "patches": self.patches,
+            "groups": self.groups,
             # Object attributes
-            'layers': [layer.to_dict() for layer in self.layers] if hasattr(self, 'layers') else []
+            "layers": [layer.to_dict() for layer in self.layers] if hasattr(self, "layers") else [],
         }
-        
-
 
 
 class Cuelist:
-
     class CuelistElement:
         """Represents a single element within a cuelist."""
+
         def __init__(
             self,
             ms_fadeout: Optional[int] = None,
@@ -425,8 +598,8 @@ class Cuelist:
             dotted_id: Optional[str] = None,
             ms_fadein: Optional[int] = None,
             ms_crossfade: Optional[int] = None,
-                ms_duration: Optional[int] = None,
-            halt: Optional[bool] = None
+            ms_duration: Optional[int] = None,
+            halt: Optional[bool] = None,
         ) -> None:
             self.ms_fadeout: Optional[int] = ms_fadeout
             self.cue_id: Optional[int] = cue_id
@@ -441,18 +614,19 @@ class Cuelist:
         def to_dict(self) -> dict:
             """Convert the CuelistElement to a dictionary for JSON serialization."""
             return {
-                'ms_fadeout': self.ms_fadeout,
-                'cue_id': self.cue_id,
-                'ms_delay': self.ms_delay,
-                'next': self.next,
-                'dotted_id': self.dotted_id,
-                'ms_fadein': self.ms_fadein,
-                'ms_crossfade': self.ms_crossfade,
-                'ms_duration': self.ms_duration,
-                'halt': self.halt
+                "ms_fadeout": self.ms_fadeout,
+                "cue_id": self.cue_id,
+                "ms_delay": self.ms_delay,
+                "next": self.next,
+                "dotted_id": self.dotted_id,
+                "ms_fadein": self.ms_fadein,
+                "ms_crossfade": self.ms_crossfade,
+                "ms_duration": self.ms_duration,
+                "halt": self.halt,
             }
 
     """Represents a cuelist in the lighting console."""
+
     def __init__(
         self,
         ms_flash_attack: Optional[int] = None,
@@ -477,9 +651,8 @@ class Cuelist:
         block_fx: Optional[bool] = None,
         cuelist_elements: Optional[List[Dict]] = None,
         ms_flash_hold: Optional[int] = None,
-        ms_stop_time: Optional[int] = None
+        ms_stop_time: Optional[int] = None,
     ) -> None:
-        # Timing attributes
         self.ms_flash_attack: Optional[int] = ms_flash_attack
         self.ms_flash_decay: Optional[int] = ms_flash_decay
         self.ms_flash_hold: Optional[int] = ms_flash_hold
@@ -488,8 +661,6 @@ class Cuelist:
         self.ms_fadeout: Optional[int] = ms_fadeout
         self.ms_crossfade: Optional[int] = ms_crossfade
         self.ms_stop_time: Optional[int] = ms_stop_time
-        
-        # Boolean flags
         self.autoreset: Optional[bool] = autoreset
         self.chase: Optional[bool] = chase
         self.bpm_chase: Optional[bool] = bpm_chase
@@ -499,51 +670,72 @@ class Cuelist:
         self.flash_mode: Optional[bool] = flash_mode
         self.no_first_fade: Optional[bool] = no_first_fade
         self.block_fx: Optional[bool] = block_fx
-        
-        # Other attributes
         self.loops: Optional[int] = loops
         self.visual_id: Optional[int] = visual_id
         self.direction: Optional[int] = direction
         self.cuelist_id: Optional[int] = cuelist_id
         self.name: Optional[str] = name
-        
-        # Complex attributes
         self.cuelist_elements: List[CuelistElement] = [
-            CuelistElement(**element) if isinstance(element, dict) else element
-            for element in (cuelist_elements or [])
+            CuelistElement(**element) if isinstance(element, dict) else element for element in (cuelist_elements or [])
         ]
 
     def to_dict(self) -> dict:
-        """Convert the Cuelist to a dictionary for JSON serialization."""
         return {
-            'ms_flash_attack': self.ms_flash_attack,
-            'autoreset': self.autoreset,
-            'at_end_pause': self.at_end_pause,
-            'loops': self.loops,
-            'chase': self.chase,
-            'ms_chase_time': self.ms_chase_time,
-            'visual_id': self.visual_id,
-            'bpm_chase': self.bpm_chase,
-            'ms_flash_decay': self.ms_flash_decay,
-            'pcrossfade': self.pcrossfade,
-            'ms_fadeout': self.ms_fadeout,
-            'direction': self.direction,
-            'at_end_stop': self.at_end_stop,
-            'flash_mode': self.flash_mode,
-            'cuelist_id': self.cuelist_id,
-            'ms_fadein': self.ms_fadein,
-            'ms_crossfade': self.ms_crossfade,
-            'no_first_fade': self.no_first_fade,
-            'name': self.name,
-            'block_fx': self.block_fx,
-            'cuelist_elements': [elem.to_dict() for elem in self.cuelist_elements],
-            'ms_flash_hold': self.ms_flash_hold,
-            'ms_stop_time': self.ms_stop_time
+            "ms_flash_attack": self.ms_flash_attack,
+            "autoreset": self.autoreset,
+            "at_end_pause": self.at_end_pause,
+            "loops": self.loops,
+            "chase": self.chase,
+            "ms_chase_time": self.ms_chase_time,
+            "visual_id": self.visual_id,
+            "bpm_chase": self.bpm_chase,
+            "ms_flash_decay": self.ms_flash_decay,
+            "pcrossfade": self.pcrossfade,
+            "ms_fadeout": self.ms_fadeout,
+            "direction": self.direction,
+            "at_end_stop": self.at_end_stop,
+            "flash_mode": self.flash_mode,
+            "cuelist_id": self.cuelist_id,
+            "ms_fadein": self.ms_fadein,
+            "ms_crossfade": self.ms_crossfade,
+            "no_first_fade": self.no_first_fade,
+            "name": self.name,
+            "block_fx": self.block_fx,
+            "cuelist_elements": [elem.to_dict() for elem in self.cuelist_elements],
+            "ms_flash_hold": self.ms_flash_hold,
+            "ms_stop_time": self.ms_stop_time,
         }
 
 
 class Playback:
-    def __init__(self, fader_value=None, on_load_play=None, fader_mode=None, chase=None, index=None, ms_chase_time=None, fader_up_play=None, priority=None, bpm_chase=None, on_page_stop=None, trigger_level=None, is_executor=None, pcrossfade=None, ms_fadeout=None, fader_down_stop=None, ms_fadein=None, ms_crossfade=None, on_page_play=None, xct_color=None, cuelist=None, xct_push_mode=None, docked=None, xct_cuelist=None, page=None):
+    def __init__(
+        self,
+        fader_value=None,
+        on_load_play=None,
+        fader_mode=None,
+        chase=None,
+        index=None,
+        ms_chase_time=None,
+        fader_up_play=None,
+        priority=None,
+        bpm_chase=None,
+        on_page_stop=None,
+        trigger_level=None,
+        is_executor=None,
+        pcrossfade=None,
+        ms_fadeout=None,
+        fader_down_stop=None,
+        ms_fadein=None,
+        ms_crossfade=None,
+        on_page_play=None,
+        xct_color=None,
+        cuelist=None,
+        xct_push_mode=None,
+        docked=None,
+        xct_cuelist=None,
+        page=None,
+        ignore_grand_master=None,
+    ):
         self.fader_value = fader_value
         self.on_load_play = on_load_play
         self.fader_mode = fader_mode
@@ -568,16 +760,56 @@ class Playback:
         self.docked = docked
         self.xct_cuelist = xct_cuelist
         self.page = page
-        
+        self.ignore_grand_master = ignore_grand_master
+
     @property
     def combined_id(self):
         """Return a combined ID using both page and index in the format 'page.index'"""
         return f"{self.page}.{self.index}" if self.page is not None and self.index is not None else str(self.index)
 
+    def to_dict(self) -> dict:
+        return {
+            "fader_value": self.fader_value,
+            "on_load_play": self.on_load_play,
+            "fader_mode": self.fader_mode,
+            "chase": self.chase,
+            "index": self.index,
+            "ms_chase_time": self.ms_chase_time,
+            "fader_up_play": self.fader_up_play,
+            "priority": self.priority,
+            "bpm_chase": self.bpm_chase,
+            "on_page_stop": self.on_page_stop,
+            "trigger_level": self.trigger_level,
+            "is_executor": self.is_executor,
+            "pcrossfade": self.pcrossfade,
+            "ms_fadeout": self.ms_fadeout,
+            "fader_down_stop": self.fader_down_stop,
+            "ms_fadein": self.ms_fadein,
+            "ms_crossfade": self.ms_crossfade,
+            "on_page_play": self.on_page_play,
+            "xct_color": self.xct_color,
+            "cuelist": self.cuelist,
+            "xct_push_mode": self.xct_push_mode,
+            "docked": self.docked,
+            "xct_cuelist": self.xct_cuelist,
+            "page": self.page,
+            "ignore_grand_master": self.ignore_grand_master,
+            "combined_id": self.combined_id,
+        }
+
 
 class General:
     class Config:
-        def __init__(self, update_mode=None, executors_exclusive_mode=None, remove_non_empty_cuelist=None, clear_ltp=None, bpm_mode=None, show_password=None, show_password_enabled=None):
+        def __init__(
+            self,
+            update_mode=None,
+            executors_exclusive_mode=None,
+            remove_non_empty_cuelist=None,
+            clear_ltp=None,
+            bpm_mode=None,
+            show_password=None,
+            show_password_enabled=None,
+        ):
             self.update_mode = update_mode
             self.executors_exclusive_mode = executors_exclusive_mode
             self.remove_non_empty_cuelist = remove_non_empty_cuelist
@@ -585,66 +817,65 @@ class General:
             self.bpm_mode = bpm_mode
             self.show_password = show_password
             self.show_password_enabled = show_password_enabled
-    
+
     def __init__(self, config=None):
         self.config = config if config is not None else self.Config()
 
 
-
 class FXPalette:
-    def __init__(self, fx_palette: int = None, cue_id: int = None, visual_id: int = None, 
-                 fxs: List['FX'] = None, fxs_channels: List[dict] = None, 
-                 orders: List[Order] = None, name: str = None) -> None:
+    def __init__(
+        self,
+        fx_palette: int = None,
+        cue_id: int = None,
+        visual_id: int = None,
+        fxs: List["FX"] = None,
+        fxs_channels: List[dict] = None,
+        orders: List[Order] = None,
+        name: str = None,
+    ) -> None:
         self.fx_palette: int = fx_palette
         self.cue_id: int = cue_id
         self.visual_id: int = visual_id
-        self.fxs: List['FX'] = fxs if fxs is not None else []
+        self.fxs: List["FX"] = fxs if fxs is not None else []
         self.fxs_channels: List[dict] = fxs_channels if fxs_channels is not None else []
         self.orders: List[Order] = orders if orders is not None else []
         self.name: str = name
-        
+
     def to_dict(self) -> dict:
-        """Convert the Cue object to a dictionary for JSON serialization."""
-        # Helper function to convert bytes to Unicode escape sequences in nested structures
         def convert_bytes(obj):
             if isinstance(obj, bytes):
                 # Convert bytes to a string of Unicode escape sequences (e.g., b'\x02\x04' -> '\\u0002\\u0004')
-                return ''.join(f'\\u{byte:04x}' for byte in obj)
+                return "".join(f"\\u{byte:04x}" for byte in obj)
             elif isinstance(obj, dict):
                 return {str(k): convert_bytes(v) for k, v in obj.items()}
             elif isinstance(obj, (list, tuple)):
                 return [convert_bytes(item) for item in obj]
             return obj
-            
-        # Convert fxs_channels to ensure all bytes are converted to Unicode escape sequences
+
         converted_fxs_channels = convert_bytes(self.fxs_channels)
-        
-        # Convert fxs list
         fxs_list = []
         for fx in self.fxs:
-            if hasattr(fx, 'to_dict'):
+            if hasattr(fx, "to_dict"):
                 fxs_list.append(fx.to_dict())
-            elif hasattr(fx, '__dict__'):
+            elif hasattr(fx, "__dict__"):
                 fxs_list.append(fx.__dict__)
             else:
                 fxs_list.append(fx)
-        
-        # Convert orders
         orders_list = []
         for order in self.orders:
-            if hasattr(order, 'to_dict'):
+            if hasattr(order, "to_dict"):
                 orders_list.append(order.to_dict())
-            elif hasattr(order, '__dict__'):
+            elif hasattr(order, "__dict__"):
                 orders_list.append(order.__dict__)
             else:
                 orders_list.append(order)
-        
+
         return {
-            'fx_palette': self.fx_palette,
-            'cue_id': self.cue_id,
-            'visual_id': self.visual_id,
-            'fxs': fxs_list if self.fxs else None,  # Set to None if empty list
-            'fxs_channels': converted_fxs_channels,
-            'orders': orders_list,
-            'name': self.name
+            "fx_palette": self.fx_palette,
+            "cue_id": self.cue_id,
+            "visual_id": self.visual_id,
+            "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
+            "fxs_channels": converted_fxs_channels,
+            "orders": orders_list,
+            "name": self.name,
         }

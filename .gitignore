@@ -1,9 +1,8 @@
 
 # Custom
 Lightshows/
-testing_utils
-TODO.txt
 *.json
+tests/analyze_show.py
 
 
 # Byte-compiled / optimized / DLL files
