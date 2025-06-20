@@ -1,9 +1,13 @@
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TypedDict
+from pathlib import Path
+from datetime import datetime
+from dataclasses import dataclass, field
 
 
 class Lightshow:
     def __init__(
         self,
+        filepath: str,
         fileinfo: Dict = None,
         models: Dict = None,
         patches: Dict[Any, "Patch"] = None,
@@ -15,6 +19,19 @@ class Lightshow:
         fxpalettes: Dict = None,
         general: Dict = None,
     ):
+        self._filepath = Path(filepath)
+        if not self._filepath.exists():
+            raise FileNotFoundError(f"File {filepath} does not exist")
+        self._parsed_date = datetime.now()
+        self._filename = self._filepath.name
+        stats = self._filepath.stat()
+        self._created_at = datetime.fromtimestamp(stats.st_ctime)
+        self._modified_at = datetime.fromtimestamp(stats.st_mtime)
+        self._parsed_date = self._parsed_date.strftime("%Y-%m-%d %H:%M:%S")
+        self._created_at = self._created_at.strftime("%Y-%m-%d %H:%M:%S")
+        self._modified_at = self._modified_at.strftime("%Y-%m-%d %H:%M:%S")
+
+        ## SECTIONS ##
         self._fileinfo: Dict = fileinfo if fileinfo is not None else {}
         self._models: Dict[Any, Any] = models if models is not None else {}
         self._patches: Dict[Any, "Patch"] = patches if patches is not None else {}
@@ -51,132 +68,120 @@ class Lightshow:
             "general": to_dict_recursive(self._general),
         }
 
-    
     def summarise(self):
-        """
-        FORMAT:
-        
-        === SHOW INFO ===
+        from .summariser import format_show_info, format_patches, format_groups
 
-        File name: ______.lshw
-        Date parsed: __/__/____
-        Creation Date:
-        Last Modified: __/__/____
-
-        Fixtures: __ (count)
-        Cues: __ (count)
-        Cuelists: __ (count)
+        return format_show_info(self) + "\n\n" + format_patches(self) + "\n\n" + format_groups(self)
 
 
-        ===== FIXTURES =====
-        [name] (IDs: [id1], [id2], ...):
-            universe: __
-            inverse_tilt: True/False
-            inverse_pan: True/False
-            type: (ig we can have a dict of ftypes and what they correspond to? )
-        ...
+class FileInfo:
+    @dataclass
+    class Version:
+        subversion: int = 0
+        version: int = 0
+        autoload: bool = False
+        software: str = ""
 
-        ===== GROUPS =====
-        [description]  (ID: [group_id]) (AUTO-GENERATED)
-            Fixtures: [patched_elements_ids]
+        def to_dict(self) -> Dict[str, Any]:
+            return {
+                "subversion": self.subversion,
+                "version": self.version,
+                "autoload": self.autoload,
+                "software": self.software,
+            }
 
+    def __init__(self, version: Optional[Version] = None):
+        self.version = version if version is not None else self.Version()
 
-        === PALETTES ===
-        [name]: (ID [user_palette_id])
-            Section: (section)
-            Orders:
-                [patch name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
-                [patch name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
-                ...
-        ...
-
-
-        === CUELISTS ===
-        [name]: (ID [cue_id])
-            Cuelist Settings:
-                Deactivate after last cue: True/False (at_end_stop)
-                Deactivate resets to first cue: True/False (autoreset)
-                Halt last cue: True/False (at_end_pause)
-                Block FX: True/False (block_fx)
-                Deactivate Time: __ms (ms_stop_time)
-                
-            Chase:
-                (if chase is true) {
-                    Chase Time: __ms (ms_chase_time)
-                    Chase Speed: __ bpm (bpm_chase)
-                    Crossfade %: __% (pcrossfade)
-                    Loops: __ (loops)
-                    Direction: (map this)
-                }
-
-            Cues:
-                [dottedid]: (cue name) | Wait: __ms/halt| Crossfade: | Fade In: | Fade Out: | Next Cue: (next_cue_dottedid)
-        ....
+    def to_dict(self) -> Dict[str, Any]:
+        return {"version": self.version.to_dict() if self.version else None}
 
 
-        === CUES ===
-            [name] (ID: [id])
-            Fixtures:
-                [palette_name] (id): (patchids)
-                [palette_name] (id): (patchids)
-
-                Non-palettes:
-                [patch_name] (ID: [id]): (for eqch order with this patch, give [ftype: value])
-                ...
-            
-            FXs:
-                [fxpalette_name] (id): (patchids)
-                [fxpalette_name] (id): (patchids)
-
-                Non-fxpalettes:
-                same representation as fx palettes from below
-
-        
-        --- FX PALETTES---
-
-        [fxpalette_id]:
-            FX (gfxid):
-                Patches: (list of patches)
-                Direction: (map direction to smth)
-                Split: (split)
-                Repeats: (repeats)
-                Speed: (speed if not bpm) (bpm if bpm)
-                Width: (width)%
-                Phase/Spread: (spread)
-                Offset: (offset)
-                Basic: True (fx_ref mapping)
-
-                (if not basic):
-                Advanced FX Layers:
-                (id): (ftypes) 
-                    Layer Offset: (phase_offset)
-                    Size: (size)
-                    Blind: (blind)
-                    (step_name):
-                        Start Point: (sum of prev ancho)/1024*360
-                        Start Limit: (start_limit)
-                        End Limit: (end_limit)
-                        Curve Type: (curve_type)
-                        Curve Parameters:
-                            Start Point: (inicio) [NOTE: unused for most curve types]
-                            In - (curve_in)
-                            Out - (curve_out)
-                            Strength - (strength) [NOTE: unused for most curve types]
-                            Jumps - (jumps) [NOTE: unused for most curve types]
-                    ...
-                ...
-            ...
-        ...
+@dataclass
+class ModelPalette:
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    values: Optional[List[Any]] = field(default_factory=list)
+    name: Optional[str] = None
+    type_id: Optional[int] = None
 
 
-        END
-        """
+@dataclass
+class ModelHardware:
+    width: Optional[float] = None
+    depth: Optional[float] = None
+    max_power: Optional[float] = None
+    weight: Optional[float] = None
+    height: Optional[float] = None
+
+
+@dataclass
+class MacroStep:
+    ms_wait: Optional[int] = None
+    values: Optional[List[Any]] = field(default_factory=list)
+
+
+@dataclass
+class Macro:
+    macro_name: Optional[str] = None
+    steps: Optional[List[MacroStep]] = field(default_factory=list)
+    name: Optional[str] = None
+
+
+@dataclass
+class ModelValueStep:
+    step_name: Optional[str] = None
+    step_value: Optional[int] = None
+    # im not too sure about these 3
+    min_str: Optional[str] = None
+    max_str: Optional[str] = None
+    symbol: Optional[str] = None
+
+
+@dataclass
+class ModelValue:
+    index: Optional[int] = None
+    inverse: Optional[bool] = None
+    instant: Optional[bool] = None
+    description: Optional[str] = None
+    ftype: Optional[int] = None
+    steps: Optional[List[Any]] = field(default_factory=list)
+    htp: Optional[bool] = None
+    size: Optional[int] = None
 
 
 class Model:
-    def __init__(self, model_id: int) -> None:
-        self.model_id: int = model_id
-        self.palettes: List[Any] = []
+    def __init__(
+        self,
+        model_id: int,
+        palette: Optional[ModelPalette] = None,
+        name: Optional[str] = None,
+        short_name: Optional[str] = None,
+        default_inverted_pan: Optional[bool] = None,
+        brand: Optional[str] = None,
+        hardware: Optional[ModelHardware] = None,
+        macros: Optional[List[Macro]] = None,
+        use_virtual_dimmer: Optional[bool] = None,
+        default_inverted_tilt: Optional[bool] = None,
+        values: Optional[List[ModelValue]] = None,
+        mode_name: Optional[str] = None,
+        virtual_dimmer_channels: Optional[List[int]] = None,
+        size: Optional[int] = None,
+    ) -> None:
+        self.model_id = model_id
+        self.palette = palette if palette is not None else ModelPalette()
+        self.name = name
+        self.short_name = short_name
+        self.default_inverted_pan = default_inverted_pan
+        self.brand = brand
+        self.hardware = hardware if hardware is not None else ModelHardware()
+        self.macros = macros if macros is not None else []
+        self.use_virtual_dimmer = use_virtual_dimmer
+        self.default_inverted_tilt = default_inverted_tilt
+        self.values = values if values is not None else []
+        self.mode_name = mode_name
+        self.virtual_dimmer_channels = virtual_dimmer_channels if virtual_dimmer_channels is not None else []
+        self.size = size
 
 
 class Patch:
@@ -389,7 +394,6 @@ class Cue:
             "orders": orders_list,
             "name": self.name,
         }
-    
 
 
 class FX:
@@ -474,7 +478,7 @@ class FX:
                 "curve_out": self.curve_out,
                 "strength": self.strength,
                 "curve_type": self.curve_type,
-                "palette_value": palette_value,
+                "palette_value": self.palette_value,
                 "inicio": self.inicio,
                 "end_limit": self.end_limit,
                 "jumps": self.jumps,
@@ -540,7 +544,6 @@ class FX:
         self.layers: List[FX.FXLayer] = layers if layers is not None else []
 
     def to_dict(self) -> dict:
-        """Convert the FX object to a dictionary for JSON serialization."""
         # Convert layers to their dictionary representation
         layers_list = []
         for layer in self.layers:
@@ -587,8 +590,6 @@ class FX:
 
 class Cuelist:
     class CuelistElement:
-        """Represents a single element within a cuelist."""
-
         def __init__(
             self,
             ms_fadeout: Optional[int] = None,
@@ -612,7 +613,6 @@ class Cuelist:
             self.halt: Optional[bool] = halt
 
         def to_dict(self) -> dict:
-            """Convert the CuelistElement to a dictionary for JSON serialization."""
             return {
                 "ms_fadeout": self.ms_fadeout,
                 "cue_id": self.cue_id,
@@ -624,8 +624,6 @@ class Cuelist:
                 "ms_duration": self.ms_duration,
                 "halt": self.halt,
             }
-
-    """Represents a cuelist in the lighting console."""
 
     def __init__(
         self,

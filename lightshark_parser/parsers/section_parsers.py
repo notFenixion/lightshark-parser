@@ -7,9 +7,13 @@ from .attribute_parsers import (
     _read_attribute_name,
     _read_obj_list_len,
     _read_number_attribute,
+    _read_number
 )
 from ..utils.custom_errors import MarkerNotFoundError
-from ..classes import Patch, Group, UserPalette, Cue, Order, FX, Cuelist, Playback, General, FXPalette
+from ..classes import (
+    FileInfo, Model, ModelValue, ModelValueStep, Macro, MacroStep, Patch, Group, UserPalette, Cue, Order, FX,
+    Cuelist, Playback, General, FXPalette, ModelPalette, ModelHardware, Macro, MacroStep
+)
 
 
 def _init_object_reading(file_bytes: bytes, ptr: int) -> tuple[int, int, int, int]:
@@ -31,7 +35,304 @@ def _init_object_reading(file_bytes: bytes, ptr: int) -> tuple[int, int, int, in
     return byte_length, initial_ptr, num_attr_indicated, ptr
 
 
-def read_patch(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+#### FILEINFO ####
+
+def read_version(file_bytes: bytes, ptr: int) -> tuple[FileInfo.Version, int]:
+    version = {}
+    if file_bytes[ptr : ptr + 12] != b"\x00\x00\x00\x08\xa7version":
+        raise MarkerNotFoundError("Could not find version marker in file")
+    ptr += 12
+    version_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
+    attributes = [
+        "subversion",
+        "version",
+        "autoload",
+        "software",
+    ]
+
+    num_attr = 0
+    while num_attr < num_attr_indicated and file_bytes[ptr] != 0x00:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "version")
+
+        if attr_name in ["subversion", "version",]:
+            ptr = _read_number_attribute(file_bytes, ptr, version, attr_name)
+        elif attr_name in ["autoload"]:
+            ptr = _read_boolean_attribute(file_bytes, ptr, version, attr_name)
+        elif attr_name in ["software"]:
+            ptr = _read_string_attribute(file_bytes, ptr, version, attr_name)
+        else:
+            raise AttributeError("Unexpected error occurred while processing version")
+
+        logging.debug("Found attribute %s with value = %s", attr_name, version[attr_name])
+        num_attr += 1
+
+    _obj_checker(initial_ptr, ptr, version_bytelength, num_attr, num_attr_indicated)
+    return FileInfo.Version(**version), ptr
+
+
+def read_fileinfo(file_bytes: bytes, ptr: int) -> tuple[FileInfo, int]:
+    # Will add more attributes if I find more
+    fileinfo = {}
+    version, ptr = read_version(file_bytes, ptr)
+    fileinfo["version"] = version
+    return FileInfo(**fileinfo), ptr
+
+
+#### MODELS ####
+
+def read_model_palette(file_bytes: bytes, ptr: int) -> tuple[ModelPalette, int]:
+    model_palette = {}
+    num_attr_indicated, ptr = _read_obj_list_len(file_bytes, ptr)
+    num_attr = 0
+
+    attributes = [
+        "color",
+        "icon",
+        "values",
+        "name",
+        "type_id"
+    ]
+    while num_attr < num_attr_indicated:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "ModelPalette")
+        if attr_name in ["color", "icon", "name", "type_id"]:
+            ptr = _read_string_attribute(file_bytes, ptr, model_palette, attr_name)
+        elif attr_name == "values":
+            values = []
+            num_values, ptr = _read_obj_list_len(file_bytes, ptr)
+            for _ in range(num_values):
+                logging.debug(file_bytes[ptr:ptr+10])
+                if file_bytes[ptr] != 0x92:
+                    
+                    raise ValueError(f"Marker \\x92 expected but {hex(file_bytes[ptr])} was found instead. (NOTE: there might be other values I'm not aware of. Feel free to report!)")
+                ptr += 1
+                ftype, ptr = _read_number(file_bytes, ptr)
+                value, ptr = _read_number(file_bytes, ptr)
+                logging.debug([hex(ftype), hex(value)])
+                values.append([ftype, value])
+            model_palette[attr_name] = values
+
+
+        else:
+            raise AttributeError("Unexpected error occurred while processing ModelPalette")
+        logging.debug("Found attribute %s with value = %s", attr_name, model_palette[attr_name])
+        num_attr += 1
+    
+    return ModelPalette(*model_palette), ptr
+
+def read_model_hardware(file_bytes: bytes, ptr: int) -> tuple[ModelHardware, int]:
+    hardware = {}
+    # All attributes of ModelHardware are strings
+    attributes = [
+        "width",
+        "depth",
+        "max_power",
+        "weight",
+        "height"
+    ]
+    num_attr_indicated = _read_obj_list_len(file_bytes, ptr)
+    num_attr = 0
+    while num_attr < num_attr_indicated:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "ModelHardware")
+        if attr_name in ["width", "depth", "max_power", "weight", "height"]:
+            ptr = _read_string_attribute(file_bytes, ptr, hardware, attr_name)
+        else:
+            raise AttributeError(f"Unexpected attribute '{attr_name}' found while processing ModelHardware")
+        logging.debug("Found hardware attribute %s with value = %s", attr_name, hardware[attr_name])
+        num_attr += 1
+    return ModelHardware(**hardware), ptr
+
+def read_model_macro(file_bytes: bytes, ptr: int) -> tuple["Macro", int]:
+
+
+    macro = {}
+    attributes = ["name", "steps"]
+    num_attr_indicated = _read_obj_list_len(file_bytes, ptr)
+    num_attr = 0
+    ptr = _read_string_attribute(file_bytes, ptr, macro, "type")
+
+    while num_attr < num_attr_indicated:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "Macro")
+        if attr_name in ["name"]:
+            ptr = _read_string_attribute(file_bytes, ptr, macro, attr_name)
+        elif attr_name == "steps":
+            steps = []
+            num_steps = _read_obj_list_len(file_bytes, ptr)
+            for _ in range(num_steps):
+                step, ptr = read_model_macro_step(file_bytes, ptr)
+                steps.append(step)
+            macro["steps"] = steps
+        else:
+            raise AttributeError(f"Unexpected attribute '{attr_name}' found while processing Macro")
+        num_attr += 1
+
+    return Macro(**macro), ptr
+
+
+def read_model_macro_step(file_bytes: bytes, ptr: int) -> tuple[MacroStep, int]:
+    if file_bytes[ptr] != 0x82:
+        raise ValueError(f"Expected step object marker 0x82, got {hex(file_bytes[ptr])}")
+    ptr += 1  # skip 0x82
+
+    step = {}
+    attributes = ["ms_wait", "values"]
+    num_attr_indicated = _read_obj_list_len(file_bytes, ptr)
+    num_attr = 0
+
+    while num_attr < num_attr_indicated:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "MacroStep")
+        if attr_name == "ms_wait":
+            ptr = _read_number_attribute(file_bytes, ptr, step, "ms_wait")
+        elif attr_name == "values":
+            values = []
+            num_values = _read_obj_list_len(file_bytes, ptr)
+            for _ in range(num_values):
+                if file_bytes[ptr] != 0x92:
+                    raise ValueError(f"Expected value object marker 0x92, got {hex(file_bytes[ptr])}")
+                ptr += 1
+                value_obj = {}
+                ptr = _read_string_attribute(file_bytes, ptr, value_obj, "name")
+                ptr = _read_number_attribute(file_bytes, ptr, value_obj, "value")
+                values.append(value_obj)
+            step["values"] = values
+        else:
+            raise AttributeError(f"Unexpected attribute '{attr_name}' found while processing MacroStep")
+        num_attr += 1
+
+    return MacroStep(**step), ptr
+
+def read_model_value(file_bytes: bytes, ptr: int) -> tuple[ModelValue, int]:
+    value_obj = {}
+    if file_bytes[ptr] != 0x88:
+        raise ValueError(f"Expected ModelValue marker 0x88, got {hex(file_bytes[ptr])}. (NOTE: marker is not confirmed to be 0x88 only)")
+    num_attr_indicated, ptr = _read_obj_list_len(file_bytes, ptr)
+    attributes = ["index", "inverse", "instant", "description", "ftype", "steps", "htp", "size"]
+    num_attr = 0
+    while num_attr < num_attr_indicated:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "Value")
+        if attr_name in ["index", "ftype"]:
+            ptr = _read_number_attribute(file_bytes, ptr, value_obj, attr_name)
+        elif attr_name in ["inverse", "instant", "htp"]:
+            ptr = _read_boolean_attribute(file_bytes, ptr, value_obj, attr_name)
+        elif attr_name == "description":
+            ptr = _read_string_attribute(file_bytes, ptr, value_obj, attr_name)
+        elif attr_name == "steps":
+            steps_list = {}
+            num_steps, ptr = _read_obj_list_len(file_bytes, ptr)
+            for _ in range(num_steps):
+                id, ptr = _read_number(file_bytes, ptr)
+                step_obj, ptr = read_model_value_step(file_bytes, ptr)
+                steps_list[id] = step_obj
+            value_obj["steps"] = steps_list
+        elif attr_name == "size":
+            ptr = _read_number_attribute(file_bytes, ptr, value_obj, attr_name)
+        else:
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing Value")
+        logging.debug("Found attribute %s with value = %s", attr_name, value_obj.get(attr_name))
+        num_attr += 1
+    
+    return ModelValue(**value_obj), ptr
+
+
+def read_model_value_step(file_bytes: bytes, ptr: int) -> tuple[ModelValueStep, int]:
+    step = {}
+    if file_bytes[ptr] != 0x95:
+        raise ValueError(f"Expected ModelValueStep marker 0x95, got {hex(file_bytes[ptr])} (NOTE: marker is not confirmed to be 0x95 only)")
+    ptr += 1
+    ptr = _read_string_attribute(file_bytes, ptr, step, "step_name")
+    ptr = _read_number_attribute(file_bytes, ptr, step, "step_value")
+    ptr = _read_string_attribute(file_bytes, ptr, step, "min_str")
+    ptr = _read_string_attribute(file_bytes, ptr, step, "max_str")
+    ptr = _read_string_attribute(file_bytes, ptr, step, "symbol")
+    return ModelValueStep(**step), ptr
+
+def read_model(file_bytes: bytes, ptr: int) -> tuple[Model, int]:
+    """
+    model_id,
+    palette: {color, icon, values, name, type_id},
+    name, short_name, default_inverted_pan, brand,
+    hardware: {width, depth, max_power, weight, height},
+    macros: {
+        [macro_name],
+        steps: {ms_wait, values},
+        name
+    },
+    use_virtual_dimmer, default_inverted_tilt,
+    values: {
+        index, inverse, instant, description, ftype,
+        steps: {values or smth idk}
+        htp, size
+    }
+    mode_name, virtual_dimmer_channels, size
+    """
+    model = {}
+    model_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
+
+    attributes = [
+        "model_id",
+        "palette",
+        "name",
+        "short_name",
+        "default_inverted_pan",
+        "brand",
+        "hardware",
+        "macros",
+        "use_virtual_dimmer",
+        "default_inverted_tilt",
+        "values",
+        "mode_name",
+        "virtual_dimmer_channels",
+        "size"
+    ]
+    num_attr = 0
+    while file_bytes[ptr] != 0x00:
+        attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "model")
+
+        if attr_name in ["model_id", "type_id", "size"]:
+            ptr = _read_number_attribute(file_bytes, ptr, model, attr_name)
+        elif attr_name in ["default_inverted_pan", "use_virtual_dimmer", "default_inverted_tilt"]:
+            ptr = _read_boolean_attribute(file_bytes, ptr, model, attr_name)
+        elif attr_name in ["name", "short_name", "brand", "mode_name"]:
+            ptr = _read_string_attribute(file_bytes, ptr, model, attr_name)
+        elif attr_name == "virtual_dimmer_channels":
+            ptr = _read_list_attribute(file_bytes, ptr, model, attr_name)
+        elif attr_name == "palette":
+            palettes_dict = {}
+            num_palettes, ptr = _read_obj_list_len(file_bytes, ptr)
+            for _ in range(num_palettes):
+                id, ptr = _read_number(file_bytes, ptr)
+                palettes_dict[id], ptr = read_model_palette(file_bytes, ptr)
+            model["palette"] = palettes_dict
+
+        elif attr_name == "hardware":
+            model["hardware"], ptr = read_model_hardware(file_bytes, ptr)
+
+        elif attr_name == "macros":
+            num_macros, ptr = _read_obj_list_len(file_bytes, ptr)
+            macros = {}
+            for _ in range(num_macros):
+                macro, ptr = read_model_macro(file_bytes, ptr)
+                macros[macro.type] = macro
+            model["macros"] = macros
+        elif attr_name == "values":
+            num_values, ptr = _read_obj_list_len(file_bytes, ptr)
+            values = []
+            for _ in range(num_values):
+                value_obj, ptr = read_model_value(file_bytes, ptr)
+                values.append(value_obj)
+            model["values"] = values
+        else:
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing model")
+        logging.debug("Found attribute %s with value = %s", attr_name, model.get(attr_name))
+        num_attr += 1
+
+    _obj_checker(initial_ptr, ptr, model_bytelength, num_attr, num_attr_indicated)
+    return Model(**model), ptr
+
+
+
+### PATCHES ###
+
+def read_patch(file_bytes: bytes, ptr: int) -> tuple[Patch, int]:
     patch = {}
     patch_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
 
@@ -67,10 +368,7 @@ def read_patch(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
             ptr = _read_string_attribute(file_bytes, ptr, patch, attr_name)
         # Complex attributes
         elif attr_name == "channels_ftype":
-            num_channels, ptr = _read_obj_list_len(file_bytes, ptr)
-            patch[attr_name] = []
-            for _ in range(num_channels):
-                ptr = _read_number_attribute(file_bytes, ptr, patch, attr_name)
+            ptr = _read_list_attribute(file_bytes, ptr, patch, attr_name)
         elif attr_name == "dimmer":
             # genuinely i have no idea how this one is meant to work
             if file_bytes[ptr] != 0xCB:
@@ -85,7 +383,7 @@ def read_patch(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         elif attr_name == "virtual_dimmer":
             ptr = _read_list_attribute(file_bytes, ptr, patch, attr_name)
         else:
-            raise AttributeError("Unexpected error occurred while processing patch")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing patch")
         logging.debug("Found attribute %s with value = %s", attr_name, patch[attr_name])
         num_attr += 1
 
@@ -93,7 +391,7 @@ def read_patch(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return Patch(**patch), ptr
 
 
-def read_group(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_group(file_bytes: bytes, ptr: int) -> tuple[Group, int]:
     group = {}
     group_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
 
@@ -141,7 +439,7 @@ def read_group(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
                 ptr += 2
             group[attr_name] = steps
         else:
-            raise AttributeError("Unexpected error occurred while processing group")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing group")
         logging.debug("Found attribute %s with value = %s", attr_name, group[attr_name])
         num_attr += 1
 
@@ -165,7 +463,7 @@ def read_order(file_bytes: bytes, ptr: int) -> tuple[Order, int]:
         elif attr_name in ["value"]:
             ptr = _read_number_attribute(file_bytes, ptr, order, attr_name, b"\xa7channel")
         else:
-            raise AttributeError("Unexpected error occurred while processing order")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing order")
         logging.debug("Found attribute %s with value = %s", attr_name, order[attr_name])
         num_attr += 1
 
@@ -177,7 +475,7 @@ def read_order(file_bytes: bytes, ptr: int) -> tuple[Order, int]:
     return order_obj, ptr
 
 
-def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[UserPalette, int]:
     palette = {}
     palette_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
 
@@ -198,7 +496,7 @@ def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
                 order, ptr = read_order(file_bytes, ptr)
                 palette[attr_name].append(order)
         else:
-            raise AttributeError("Unexpected error occurred while processing user_palette")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing user_palette")
         logging.debug("Found attribute %s with value = %s", attr_name, palette[attr_name])
         num_attr += 1
 
@@ -206,7 +504,7 @@ def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return UserPalette(**palette), ptr
 
 
-def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[FX.FXLayerStep, int]:
     logging.debug("-" * 40 + " Parsing FX Layer Step " + "-" * 40)
     if file_bytes[ptr] != 0x8C:
         raise ValueError(f"Incorrect number of attributes specified for step in FX layer. Expected 0x8C, got {hex(file_bytes[ptr])}")
@@ -248,7 +546,7 @@ def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         elif attr_name in ["name"]:
             ptr = _read_string_attribute(file_bytes, ptr, step, attr_name)
         else:
-            raise AttributeError("Unexpected error occurred while processing step")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing step")
         logging.debug("Found attribute %s with value = %s", attr_name, step[attr_name])
         num_attr += 1
 
@@ -258,7 +556,7 @@ def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return FX.FXLayerStep(**step), ptr
 
 
-def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[FX.FXLayer, int]:
     logging.debug("=" * 45 + " Parsing FX Layer " + "=" * 45)
     if file_bytes[ptr] != 0x88:
         raise ValueError(f"Incorrect number of attributes specified for layer in FX. Expected 0x88, got {hex(file_bytes[ptr])}")
@@ -294,7 +592,7 @@ def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
                 layer[attr_name].append(file_bytes[ptr + 1 : ptr + ftype_len + 1].decode("utf-8"))
                 ptr += ftype_len + 1
         else:
-            raise AttributeError("Unexpected error occurred while processing layer")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing layer")
         logging.debug("Found attribute %s with value = %s", attr_name, layer[attr_name])
         num_attr += 1
 
@@ -304,7 +602,7 @@ def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return FX.FXLayer(**layer), ptr
 
 
-def read_fx(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_fx(file_bytes: bytes, ptr: int) -> tuple[FX, int]:
     fx = {}
     # NOTE: different from the usual init_object_reading
     expected_marker = b"\xde\x00\x18"
@@ -372,7 +670,7 @@ def read_fx(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
                 layer, ptr = read_fx_layer(file_bytes, ptr)
                 fx[attr_name].append(layer)
         else:
-            raise AttributeError("Unexpected error occurred while processing FX")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing fx")
         logging.debug("Found attribute %s with value = %s", attr_name, fx[attr_name])
         num_attr += 1
 
@@ -381,7 +679,7 @@ def read_fx(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return FX(**fx), ptr
 
 
-def read_cue(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_cue(file_bytes: bytes, ptr: int) -> tuple[Cue, int]:
     cue = {}
     cue_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
     attributes = ["fx_palette", "cue_id", "visual_id", "fxs", "fxs_channels", "orders", "name"]
@@ -437,7 +735,7 @@ def read_cue(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
                 order_obj, ptr = read_order(file_bytes, ptr)
                 cue[attr_name].append(order_obj)
         else:
-            raise AttributeError("Unexpected error occurred while processing cue")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing cue")
         logging.debug("Found attribute %s with value = %s", attr_name, cue[attr_name])
         num_attr += 1
 
@@ -445,7 +743,7 @@ def read_cue(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return Cue(**cue), ptr
 
 
-def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[Cuelist.CuelistElement, int]:
     element = {}
     if file_bytes[ptr] != 0x89:
         raise ValueError(f"Incorrect number of attributes specified for cuelist element. Expected 0x89, got {hex(file_bytes[ptr])}")
@@ -472,7 +770,7 @@ def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         elif attr_name in ["ms_fadeout", "ms_delay", "dotted_id", "ms_fadein", "ms_crossfade", "ms_duration"]:
             ptr = _read_number_attribute(file_bytes, ptr, element, attr_name)
         else:
-            raise AttributeError("Unexpected error occurred while processing cuelist element")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing cuelist_element")
         logging.debug("Found attribute %s with value = %s", attr_name, element[attr_name])
         num_attr += 1
 
@@ -482,7 +780,7 @@ def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return Cuelist.CuelistElement(**element), ptr
 
 
-def read_cuelist(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_cuelist(file_bytes: bytes, ptr: int) -> tuple[Cuelist, int]:
     cuelist = {}
     """
     byte: loops, visual_id, flash_mode, cuelist_id, 
@@ -557,7 +855,7 @@ def read_cuelist(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
                 element, ptr = read_cuelist_element(file_bytes, ptr)
                 cuelist[attr_name].append(element)
         else:
-            raise AttributeError("Unexpected error occurred while processing cuelist")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing cuelist")
         logging.debug("Found attribute %s with value = %s", attr_name, cuelist[attr_name])
         num_attr += 1
 
@@ -565,7 +863,7 @@ def read_cuelist(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return Cuelist(**cuelist), ptr
 
 
-def read_playback(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_playback(file_bytes: bytes, ptr: int) -> tuple[Playback, int]:
     """
     byte: fader_value, index, priority, trigger_level, page, cuelist
     multibyte: fader_mode, ms_chase_time, bpm_chase, pcrossfade, ms_fadeout, ms_fadein, ms_crossfade,
@@ -639,7 +937,7 @@ def read_playback(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
         elif attr_name in ["xct_color", "xct_cuelist"]:
             ptr = _read_list_attribute(file_bytes, ptr, playback, attr_name)
         else:
-            raise AttributeError("Unexpected error occurred while processing playback")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing playback")
 
         logging.debug("Found attribute %s with value = %s", attr_name, playback[attr_name])
         num_attr += 1
@@ -648,7 +946,7 @@ def read_playback(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return Playback(**playback), ptr
 
 
-def read_config(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_config(file_bytes: bytes, ptr: int) -> tuple[General.Config, int]:
     config = {}
     if file_bytes[ptr : ptr + 11] != b"\x00\x00\x00\x07\xa6config":
         raise MarkerNotFoundError("Could not find config marker in file")
@@ -690,7 +988,7 @@ def read_config(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
     return General.Config(**config), ptr
 
 
-def read_general(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_general(file_bytes: bytes, ptr: int) -> tuple[General, int]:
     # Will add more attributes if I find more
     general = {}
     config, ptr = read_config(file_bytes, ptr)
@@ -725,15 +1023,13 @@ def read_fxpalette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
             fxpalette[attr_name] = []
             for _ in range(num_channels):
                 channel_len, ptr = _read_obj_list_len(file_bytes, ptr)
-                # logging.info("Channel length: %d", channel_len)
                 channel = []
                 i = 0
                 # NOTE: some of the channel instances have:
-                # \xD1 ?? and it doesn't count towards the channel_len for some reason?
-                # \xCD multibyte values (these count towards channel_len)
-                # will fix once I figure this out
+                # \xD1 ?? and it doesn't count towards the channel_len.
+                # I'm assuming these are deleted values, but will fix once I actually figure this out
+
                 while i < channel_len:
-                    # probably deleted? idk
                     if file_bytes[ptr] == 0xD1:
                         channel.append(file_bytes[ptr : ptr + 2])
                         ptr += 2
@@ -753,7 +1049,7 @@ def read_fxpalette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
                 order_obj, ptr = read_order(file_bytes, ptr)
                 fxpalette[attr_name].append(order_obj)
         else:
-            raise AttributeError("Unexpected error occurred while processing fxpalette")
+            raise AttributeError(f"Unexpected attribute {attr_name} found while processing fxpalette")
         logging.debug("Found attribute %s with value = %s", attr_name, fxpalette[attr_name])
         num_attr += 1
 

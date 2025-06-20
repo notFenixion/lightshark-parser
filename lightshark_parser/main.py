@@ -7,6 +7,8 @@ from pathlib import Path
 
 from .classes import Lightshow
 from .parsers.section_parsers import (
+    read_fileinfo,
+    read_model,
     read_patch,
     read_group,
     read_user_palette,
@@ -26,29 +28,27 @@ def print_dash_line():
         logging.info("-" * 80)
 
 
-def read_file_bytes(file_path):
-    if not file_path.lower().endswith(".lshw"):
+def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
+    if not filepath.lower().endswith(".lshw"):
         print("Error: File must have be of extension .lshw", file=sys.stderr)
         sys.exit(1)
     try:
-        with open(file_path, "rb") as file:
-            return file.read()
+        with open(filepath, "rb") as file:
+            file_bytes = file.read()
     except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.", file=sys.stderr)
+        print(f"Error: File '{filepath}' not found.", file=sys.stderr)
         sys.exit(1)
     except PermissionError:
-        print(f"Error: Permission denied when accessing '{file_path}'.", file=sys.stderr)
+        print(f"Error: Permission denied when accessing '{filepath}'.", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
 
-
-def parse_file_bytes(file_bytes: bytes, output_file: str = None) -> Lightshow:
     fileinfo = {}
     models = {}
-    patching = {}  # Key: patch ID, Value: Patch object
-    groups = {}  # Key: group ID, Value: Group object
+    patching = {}
+    groups = {}
     user_palettes = {}
     cues = {}
     cuelists = {}
@@ -59,16 +59,39 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None) -> Lightshow:
     schedules = {}
     osc_targets = {}
 
-    # Initial search for #patching# section
-    # NOTE THAT THIS IS TEMPORARY AND WILL BE REMOVED ONCE FILEINFO + MODEL ARE ADDED. #patching# check will be kept.
-    ptr = file_bytes.find(b"\xaa#patching#")
-    if ptr == -1:
-        raise MarkerNotFoundError("Could not find #patching# in file")
-    logging.debug(f"Found #patching# at index {ptr}")
-    ptr += 11
-    logging.debug(file_bytes[ptr : ptr + 10])
+    ptr = 0
+
+    ## FILEINFO ##
+    if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#fileinfo#":
+        logging.warning("Could not find #fileinfo# in file. If your file contains a fileinfo section, please fix it.")
+    ptr += 15
+    fileinfo, ptr = read_fileinfo(file_bytes, ptr)
+    logging.info("FOUND FILEINFO: %s", fileinfo.__dict__)
+    for obj in fileinfo.__dict__.values():
+        logging.info("Found object: %s", obj.__dict__)
+    print_dash_line()
+
+    ## MODELS ##
+    logging.info("Finished reading fileinfo. Moving onto models...")
+    if file_bytes[ptr : ptr + 13] != b"\x00\x00\x00\x09\xa8#models#":
+        raise MarkerNotFoundError("Could not find #models# in file")
+    ptr += 13
+    while file_bytes[ptr : ptr + 10] == b"\x00\x00\x00\x06\xa5model":
+        ptr += 10
+        model, ptr = read_model(file_bytes, ptr)
+        if model.model_id in models:
+            raise ValueError(f"Duplicate model ID found: {model.model_id}")
+        models[model.model_id] = model
+        logging.info("FOUND MODEL: %s", model.__dict__)
+        print_dash_line()
+    if not models:
+        logging.warning("No models found in file. Did you configure models and patches yet?")
 
     ## PATCHES ##
+    logging.info("Finished reading models. Moving onto patches...")
+    if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#patching#":
+        raise MarkerNotFoundError("Could not find #patching# in file")
+    ptr += 15
     while file_bytes[ptr : ptr + 10] == b"\x00\x00\x00\x06\xa5patch":
         ptr += 10
         patch, ptr = read_patch(file_bytes, ptr)
@@ -105,12 +128,12 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None) -> Lightshow:
     while file_bytes[ptr : ptr + 17] == b"\x00\x00\x00\x0d\xacuser_palette" or (
         deleted_flag and file_bytes[ptr : ptr + 16] == b"\x00\x00\x0d\xacuser_palette"
     ):
-        ptr += 17 if not deleted_flag else 16
+        ptr += (17 if not deleted_flag else 16)
         # For logging a unique case wherein a user_palette was deleted. Not sure if this is just an issue with a show, more testing required.
-        if file_bytes[ptr : ptr + 16] == b"\x00\x00\r\xacuser_palette":
+        if file_bytes[ptr : ptr + 16] == b"\x00\x00\x0d\xacuser_palette":
             logging.warning(
-                "user_palette marker %r not found at expected position. This may be a case wherein a user_palette was deleted and is thus ignored. It is recommended to check for missing user_palette_ids",
-                file_bytes[ptr : ptr + 16],
+                "user_palette marker '\\x00\\x00\\x0d\\xacuser_palette' was found at position %d instead of expected '\\x00\\x00\\x00\\x0d\\xacuser_palette'. This may be a case wherein a user_palette was deleted and is thus ignored. It is recommended to check for missing user_palette_ids",
+                ptr
             )
             deleted_flag = True
         else:
@@ -210,8 +233,11 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None) -> Lightshow:
                 "No fx palettes found in file. This warning is only a concern if there are fx palettes in your show but none were detected."
             )
 
+    logging.info("Finished reading FX palettes. Parsing complete! (until schedules is done)")
+
     # Create Lightshow object
     lightshow = Lightshow(
+        filepath=filepath,
         fileinfo=fileinfo,
         models=models,
         patches=patching,
@@ -304,7 +330,7 @@ def setup_logging(verbosity=0):
 def main():
     parser = argparse.ArgumentParser(description="Process LightShark show files (.lshw)")
 
-    # Add mutually exclusive group for the main actions
+    # Main actions (parse/summmarise)
     action_group = parser.add_mutually_exclusive_group(required=False)
     action_group.add_argument("-p", "--parse", action="store_true", help="Parse show file to JSON format")
     action_group.add_argument("-s", "--summarise", action="store_true", help="Generate a summary of the show file")
@@ -320,46 +346,40 @@ def main():
     )
     parser.add_argument("-o", "--output", metavar="output_file", help="Output file path")
 
-    # If no arguments provided, show help
+    # If no arguments or action specified, show help
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(0)
 
     args = parser.parse_args()
 
-    # If no action specified, show help
     if not (args.parse or args.summarise) or not args.input_file:
         parser.print_help()
         sys.exit(0)
 
-    # Setup logging based on verbosity
     setup_logging(args.verbose)
 
     try:
-        # Read the file
-        file_bytes = read_file_bytes(args.input_file)
-
         if args.parse:
-            # Handle parse command
             output_file = args.output or f"{os.path.splitext(args.input_file)[0]}.json"
-            lightshow = parse_file_bytes(file_bytes, output_file)
+            lightshow = parse_file_bytes(args.input_file, output_file)
 
             if not args.output and not args.verbose:
                 print(f"No output file specified. Output saved to: {output_file}")
 
         elif args.summarise:
-            # Handle summarise command
-            lightshow = parse_file_bytes(file_bytes)  # Parse but don't output JSON
-            summary = lightshow.summarise()
-
-            # Determine output file path
             output_file = args.output or f"{os.path.splitext(args.input_file)[0]}_summary.txt"
+            lightshow = parse_file_bytes(args.input_file)  # Parse but don't output JSON
+            summary = lightshow.summarise()
 
             # Write summary to file
             try:
                 with open(output_file, "w", encoding="utf-8") as f:
                     f.write(summary)
-                print(f"Summary saved to: {output_file}")
+                if not args.output and not args.verbose:
+                    print(f"No output file specified. Summary saved to: {output_file}")
+                else:
+                    print(f"Summary saved to: {output_file}")
             except Exception as e:
                 logging.error("Error saving summary to %s: %s", output_file, str(e))
                 sys.exit(1)

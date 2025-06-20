@@ -15,6 +15,16 @@ def _read_attribute_name(file_bytes: bytes, ptr: int, valid_attributes: list, se
     return attr_name, ptr + attr_name_len + 1
 
 
+def _read_number(file_bytes: bytes, ptr: int) -> tuple[int, int]:
+    # read_number_attribute but without needing an obj_dict
+    if file_bytes[ptr] <= 0xCB or file_bytes[ptr] > 0xCE:
+        return file_bytes[ptr], ptr + 1
+    else:
+        value_length = 2 ** (file_bytes[ptr] - 0xCC)
+        value = int.from_bytes(file_bytes[ptr + 1 : ptr + 1 + value_length], "big")
+        return value, ptr + value_length + 1
+
+
 def _read_number_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str, check: bytes = None) -> int:
     # If value is >= \xCC, it could be a length indicator for a value that is >255
     # NOTE: Might have edge cases that could cause this to break
