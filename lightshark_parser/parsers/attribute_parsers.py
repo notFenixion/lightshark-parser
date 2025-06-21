@@ -3,7 +3,7 @@ import logging
 from ..utils.custom_errors import MarkerNotFoundError
 
 
-def _read_attribute_name(file_bytes: bytes, ptr: int, valid_attributes: list, section_name: str) -> tuple[str, int]:
+def _read_attribute_name(file_bytes: bytes, ptr: int, valid_attributes: list, section_name: str, obj_dict: dict) -> tuple[str, int]:
     attr_name_len = file_bytes[ptr] - 0xA0
     if attr_name_len <= 0 or ptr + 1 + attr_name_len > len(file_bytes):
         raise ValueError(f"Invalid attribute name length {attr_name_len} at position {ptr} from value {hex(file_bytes[ptr])}")
@@ -12,6 +12,10 @@ def _read_attribute_name(file_bytes: bytes, ptr: int, valid_attributes: list, se
 
     if attr_name not in valid_attributes:
         raise ValueError(f"Attribute '{attr_name}' is not a valid {section_name} attribute. Expected one of: {valid_attributes}")
+    
+    if attr_name in obj_dict:
+        raise AttributeError(f"Duplicate instance of attribute '{attr_name}' found in {section_name}")
+        
     return attr_name, ptr + attr_name_len + 1
 
 
@@ -68,6 +72,7 @@ def _read_string_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: st
         return ptr + 1 + str_len
     # Case where xDA + 2 bytes for length
     else:
+        print("String attribute length indicator %s found at position %d", hex(file_bytes[ptr]), ptr)
         if file_bytes[ptr] != 0xDA:
             raise ValueError(f"Invalid string attribute length indicator. Expected 0xDA, got {hex(file_bytes[ptr])}")
         if ptr + 3 > len(file_bytes):

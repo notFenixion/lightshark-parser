@@ -8,40 +8,198 @@ class Lightshow:
     def __init__(
         self,
         filepath: str,
-        fileinfo: Dict = None,
-        models: Dict = None,
+        fileinfo: Dict[Any, "FileInfo"] = None,
+        models: Dict[Any, "Model"] = None,
         patches: Dict[Any, "Patch"] = None,
         groups: Dict[Any, "Group"] = None,
-        user_palettes: Dict = None,
-        cues: Dict = None,
-        cuelists: Dict = None,
-        playbacks: Dict = None,
-        fxpalettes: Dict = None,
-        general: Dict = None,
+        user_palettes: Dict[Any, "UserPalette"] = None,
+        cues: Dict[Any, "Cue"] = None,
+        cuelists: Dict[Any, "Cuelist"] = None,
+        playbacks: Dict[Any, "Playback"] = None,
+        fxpalettes: Dict[Any, "FXPalette"] = None,
+        general: Dict[Any, "General"] = None,
     ):
         self._filepath = Path(filepath)
         if not self._filepath.exists():
             raise FileNotFoundError(f"File {filepath} does not exist")
-        self._parsed_date = datetime.now()
         self._filename = self._filepath.name
         stats = self._filepath.stat()
-        self._created_at = datetime.fromtimestamp(stats.st_ctime)
-        self._modified_at = datetime.fromtimestamp(stats.st_mtime)
-        self._parsed_date = self._parsed_date.strftime("%Y-%m-%d %H:%M:%S")
-        self._created_at = self._created_at.strftime("%Y-%m-%d %H:%M:%S")
-        self._modified_at = self._modified_at.strftime("%Y-%m-%d %H:%M:%S")
+        created_at = datetime.fromtimestamp(stats.st_ctime)
+        modified_at = datetime.fromtimestamp(stats.st_mtime)
+        self._parsed_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
+        self._modified_at = modified_at.strftime("%Y-%m-%d %H:%M:%S")
 
-        ## SECTIONS ##
-        self._fileinfo: Dict = fileinfo if fileinfo is not None else {}
-        self._models: Dict[Any, Any] = models if models is not None else {}
+        # Initialize section attributes with private names
+        self._fileinfo: Dict[Any, "FileInfo"] = fileinfo if fileinfo is not None else {}
+        self._models: Dict[Any, "Model"] = models if models is not None else {}
         self._patches: Dict[Any, "Patch"] = patches if patches is not None else {}
         self._groups: Dict[Any, "Group"] = groups if groups is not None else {}
-        self._user_palettes: Dict = user_palettes if user_palettes is not None else {}
-        self._cues: Dict = cues if cues is not None else {}
-        self._cuelists: Dict = cuelists if cuelists is not None else {}
-        self._playbacks: Dict = playbacks if playbacks is not None else {}
-        self._fxpalettes: Dict = fxpalettes if fxpalettes is not None else {}
-        self._general: Dict = general if general is not None else {}
+        self._user_palettes: Dict[Any, "UserPalette"] = user_palettes if user_palettes is not None else {}
+        self._cues: Dict[Any, "Cue"] = cues if cues is not None else {}
+        self._cuelists: Dict[Any, "Cuelist"] = cuelists if cuelists is not None else {}
+        self._playbacks: Dict[Any, "Playback"] = playbacks if playbacks is not None else {}
+        self._fxpalettes: Dict[Any, "FXPalette"] = fxpalettes if fxpalettes is not None else {}
+        self._general: Dict[Any, "General"] = general if general is not None else {}
+
+    # Property getters for non-section attributes
+    @property
+    def filepath(self) -> Path:
+        return self._filepath
+        
+    @property
+    def filename(self) -> str:
+        return self._filename
+        
+    @property
+    def parsed_date(self) -> str:
+        return self._parsed_date
+        
+    @property
+    def created_at(self) -> str:
+        return self._created_at
+        
+    @property
+    def modified_at(self) -> str:
+        return self._modified_at
+
+    # Property getters for section attributes
+    @property
+    def fileinfo(self) -> Dict:
+        return self._fileinfo
+        
+    @fileinfo.setter
+    def fileinfo(self, value: Dict) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("fileinfo must be a dictionary")
+        from .classes import FileInfo  # Import here to avoid circular imports
+        for model in value.values():
+            if not isinstance(model, FileInfo):
+                raise TypeError("All model values must be FileInfo objects")
+        self._fileinfo = value
+        
+    @property
+    def models(self) -> Dict[Any, Any]:
+        return self._models
+        
+    @models.setter
+    def models(self, value: Dict[Any, Any]) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("models must be a dictionary")
+        from .classes import Model  # Import here to avoid circular imports
+        for model in value.values():
+            if not isinstance(model, Model):
+                raise TypeError("All model values must be Model objects")
+        self._models = value
+        
+    @property
+    def patches(self) -> Dict[Any, "Patch"]:
+        return self._patches
+        
+    @patches.setter
+    def patches(self, value: Dict[Any, "Patch"]) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("patches must be a dictionary")
+        from .classes import Patch  # Import here to avoid circular imports
+        for patch in value.values():
+            if not isinstance(patch, Patch):
+                raise TypeError("All patch values must be Patch objects")
+        self._patches = value
+        
+    @property
+    def groups(self) -> Dict[Any, "Group"]:
+        return self._groups
+        
+    @groups.setter
+    def groups(self, value: Dict[Any, "Group"]) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("groups must be a dictionary")
+        from .classes import Group  # Import here to avoid circular imports
+        for group in value.values():
+            if not isinstance(group, Group):
+                raise TypeError("All group values must be Group objects")
+        self._groups = value
+        
+    @property
+    def user_palettes(self) -> Dict:
+        return self._user_palettes
+        
+    @user_palettes.setter
+    def user_palettes(self, value: Dict) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("user_palettes must be a dictionary")
+        # Assuming UserPalette objects have a specific attribute or method
+        for palette in value.values():
+            if not hasattr(palette, 'user_palette_id'):
+                raise TypeError("All user_palette values must be UserPalette objects")
+        self._user_palettes = value
+        
+    @property
+    def cues(self) -> Dict:
+        return self._cues
+        
+    @cues.setter
+    def cues(self, value: Dict) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("cues must be a dictionary")
+        # Assuming Cue objects have a specific attribute or method
+        for cue in value.values():
+            if not hasattr(cue, 'cue_id'):
+                raise TypeError("All cue values must be Cue objects")
+        self._cues = value
+        
+    @property
+    def cuelists(self) -> Dict:
+        return self._cuelists
+        
+    @cuelists.setter
+    def cuelists(self, value: Dict) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("cuelists must be a dictionary")
+        # Assuming CueList objects have a specific attribute or method
+        for cuelist in value.values():
+            if not hasattr(cuelist, 'cuelist_id'):
+                raise TypeError("All cuelist values must be CueList objects")
+        self._cuelists = value
+        
+    @property
+    def playbacks(self) -> Dict:
+        return self._playbacks
+        
+    @playbacks.setter
+    def playbacks(self, value: Dict) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("playbacks must be a dictionary")
+        # Assuming Playback objects have a specific attribute or method
+        for playback in value.values():
+            if not hasattr(playback, 'playback_id'):
+                raise TypeError("All playback values must be Playback objects")
+        self._playbacks = value
+        
+    @property
+    def fxpalettes(self) -> Dict:
+        return self._fxpalettes
+        
+    @fxpalettes.setter
+    def fxpalettes(self, value: Dict) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("fxpalettes must be a dictionary")
+        # Assuming FXPalette objects have a specific attribute or method
+        for fxpalette in value.values():
+            if not hasattr(fxpalette, 'fx_palette_id'):
+                raise TypeError("All fxpalette values must be FXPalette objects")
+        self._fxpalettes = value
+        
+    @property
+    def general(self) -> Dict:
+        return self._general
+        
+    @general.setter
+    def general(self, value: Dict) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("general must be a dictionary")
+        # General section might contain mixed types, so we just validate it's a dict
+        self._general = value
 
     def to_dict(self) -> Dict:
         def to_dict_recursive(obj):
@@ -69,18 +227,21 @@ class Lightshow:
         }
 
     def summarise(self):
-        from .summariser import format_show_info, format_patches, format_groups
+        from .summariser import format_lightshow
+        return format_lightshow(self)
 
-        return format_show_info(self) + "\n\n" + format_patches(self) + "\n\n" + format_groups(self)
+    def to_bytes(self):
+        from .serialiser import serialise_lightshow
+        return serialise_lightshow(self)
 
 
 class FileInfo:
     @dataclass
     class Version:
-        subversion: int = 0
-        version: int = 0
-        autoload: bool = False
-        software: str = ""
+        subversion: int = None
+        version: int = None
+        autoload: bool = None
+        software: str = None
 
         def to_dict(self) -> Dict[str, Any]:
             return {
@@ -90,11 +251,20 @@ class FileInfo:
                 "software": self.software,
             }
 
+        def to_bytes(self):
+            content = bytearray()
+
+
     def __init__(self, version: Optional[Version] = None):
         self.version = version if version is not None else self.Version()
 
     def to_dict(self) -> Dict[str, Any]:
         return {"version": self.version.to_dict() if self.version else None}
+
+    def to_bytes(self):
+        content = bytearray()
+        
+
 
 
 @dataclass
@@ -123,7 +293,7 @@ class MacroStep:
 
 @dataclass
 class Macro:
-    macro_name: Optional[str] = None
+    macro_type: Optional[str] = None
     steps: Optional[List[MacroStep]] = field(default_factory=list)
     name: Optional[str] = None
 
@@ -285,11 +455,13 @@ class UserPalette:
         section: int = None,
         user_palette_id: int = None,
         name: str = None,
+        icon: str = None,
         orders: Optional[List["Order"]] = None,
     ) -> None:
         self.section: int = section
         self.user_palette_id: int = user_palette_id
         self.name: str = name
+        self.icon: str = icon
         self.orders: List["Order"] = orders if orders is not None else []
 
     def to_dict(self) -> dict:
@@ -297,6 +469,7 @@ class UserPalette:
             "section": self.section,
             "user_palette_id": self.user_palette_id,
             "name": self.name,
+            "icon": self.icon,
             "orders": [order.to_dict() if hasattr(order, "to_dict") else order for order in self.orders],
         }
 
@@ -340,18 +513,22 @@ class Cue:
         self,
         fx_palette: int = None,
         cue_id: int = None,
+        description: str = None,
         visual_id: int = None,
         fxs: List["FX"] = None,
         fxs_channels: List[dict] = None,
         orders: List[Order] = None,
+        actions: List["Action"] = None,
         name: str = None,
     ) -> None:
         self.fx_palette: int = fx_palette
         self.cue_id: int = cue_id
+        self.description: str = description
         self.visual_id: int = visual_id
         self.fxs: List["FX"] = fxs if fxs is not None else []
         self.fxs_channels: List[dict] = fxs_channels if fxs_channels is not None else []
         self.orders: List[Order] = orders if orders is not None else []
+        self.actions: List["Action"] = actions if actions is not None else []
         self.name: str = name
 
     def to_dict(self) -> dict:
@@ -388,7 +565,9 @@ class Cue:
         return {
             "fx_palette": self.fx_palette,
             "cue_id": self.cue_id,
+            "description": self.description,
             "visual_id": self.visual_id,
+            "actions": self.actions,
             "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
             "fxs_channels": converted_fxs_channels,
             "orders": orders_list,
@@ -723,6 +902,8 @@ class Playback:
         pcrossfade=None,
         ms_fadeout=None,
         fader_down_stop=None,
+        ignore_swap=None,
+        swap_always=None,
         ms_fadein=None,
         ms_crossfade=None,
         on_page_play=None,
@@ -733,6 +914,8 @@ class Playback:
         xct_cuelist=None,
         page=None,
         ignore_grand_master=None,
+        used_in_alarm=None,
+        xct_swap=None,
     ):
         self.fader_value = fader_value
         self.on_load_play = on_load_play
@@ -749,6 +932,8 @@ class Playback:
         self.pcrossfade = pcrossfade
         self.ms_fadeout = ms_fadeout
         self.fader_down_stop = fader_down_stop
+        self.ignore_swap = ignore_swap,
+        self.swap_always = swap_always,
         self.ms_fadein = ms_fadein
         self.ms_crossfade = ms_crossfade
         self.on_page_play = on_page_play
@@ -759,6 +944,8 @@ class Playback:
         self.xct_cuelist = xct_cuelist
         self.page = page
         self.ignore_grand_master = ignore_grand_master
+        self.used_in_alarm = used_in_alarm
+        self.xct_swap = xct_swap
 
     @property
     def combined_id(self):
@@ -782,6 +969,8 @@ class Playback:
             "pcrossfade": self.pcrossfade,
             "ms_fadeout": self.ms_fadeout,
             "fader_down_stop": self.fader_down_stop,
+            "ignore_swap": self.ignore_swap,
+            "swap_always": self.swap_always,
             "ms_fadein": self.ms_fadein,
             "ms_crossfade": self.ms_crossfade,
             "on_page_play": self.on_page_play,
@@ -789,10 +978,12 @@ class Playback:
             "cuelist": self.cuelist,
             "xct_push_mode": self.xct_push_mode,
             "docked": self.docked,
+            "used_in_alarm": self.used_in_alarm,
             "xct_cuelist": self.xct_cuelist,
             "page": self.page,
             "ignore_grand_master": self.ignore_grand_master,
             "combined_id": self.combined_id,
+            "xct_swap": self.xct_swap,
         }
 
 

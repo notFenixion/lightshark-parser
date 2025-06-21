@@ -64,12 +64,13 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     ## FILEINFO ##
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#fileinfo#":
         logging.warning("Could not find #fileinfo# in file. If your file contains a fileinfo section, please fix it.")
-    ptr += 15
-    fileinfo, ptr = read_fileinfo(file_bytes, ptr)
-    logging.info("FOUND FILEINFO: %s", fileinfo.__dict__)
-    for obj in fileinfo.__dict__.values():
-        logging.info("Found object: %s", obj.__dict__)
-    print_dash_line()
+    else:
+        ptr += 15
+        fileinfo, ptr = read_fileinfo(file_bytes, ptr)
+        logging.info("FOUND FILEINFO: %s", fileinfo.__dict__)
+        for obj in fileinfo.__dict__.values():
+            logging.info("Found object: %s", obj.__dict__)
+        print_dash_line()
 
     ## MODELS ##
     logging.info("Finished reading fileinfo. Moving onto models...")
