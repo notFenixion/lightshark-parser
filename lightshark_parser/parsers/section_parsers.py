@@ -97,18 +97,17 @@ def read_model_palette(file_bytes: bytes, ptr: int) -> tuple[ModelPalette, int]:
         if attr_name in ["color", "icon", "name", "type_id"]:
             ptr = _read_string_attribute(file_bytes, ptr, model_palette, attr_name)
         elif attr_name == "values":
-            values = []
+            values = {}
             num_values, ptr = _read_obj_list_len(file_bytes, ptr)
             for _ in range(num_values):
-                logging.debug(file_bytes[ptr:ptr+10])
+                # logging.debug(file_bytes[ptr:ptr+10])
                 if file_bytes[ptr] != 0x92:
-                    
                     raise ValueError(f"Marker \\x92 expected but {hex(file_bytes[ptr])} was found instead. (NOTE: there might be other values I'm not aware of. Feel free to report!)")
                 ptr += 1
-                ftype, ptr = _read_number(file_bytes, ptr)
-                value, ptr = _read_number(file_bytes, ptr)
+                ftype, ptr = _read_number(file_bytes, ptr, "model palette ftype")
+                value, ptr = _read_number(file_bytes, ptr, "model palette value")
                 logging.debug([hex(ftype), hex(value)])
-                values.append([ftype, value])
+                values[ftype] = value
             model_palette[attr_name] = values
 
 
@@ -212,13 +211,13 @@ def read_model_value(file_bytes: bytes, ptr: int) -> tuple[ModelValue, int]:
         elif attr_name == "description":
             ptr = _read_string_attribute(file_bytes, ptr, value_obj, attr_name)
         elif attr_name == "steps":
-            steps_list = {}
+            steps_dict = {}
             num_steps, ptr = _read_obj_list_len(file_bytes, ptr)
             for _ in range(num_steps):
-                id, ptr = _read_number(file_bytes, ptr)
+                id, ptr = _read_number(file_bytes, ptr, "model_value steps")
                 step_obj, ptr = read_model_value_step(file_bytes, ptr)
-                steps_list[id] = step_obj
-            value_obj["steps"] = steps_list
+                steps_dict[id] = step_obj
+            value_obj["steps"] = steps_dict
         elif attr_name == "size":
             ptr = _read_number_attribute(file_bytes, ptr, value_obj, attr_name)
         else:
@@ -295,7 +294,7 @@ def read_model(file_bytes: bytes, ptr: int) -> tuple[Model, int]:
             palettes_dict = {}
             num_palettes, ptr = _read_obj_list_len(file_bytes, ptr)
             for _ in range(num_palettes):
-                id, ptr = _read_number(file_bytes, ptr)
+                id, ptr = _read_number(file_bytes, ptr, "model palette id")
                 palettes_dict[id], ptr = read_model_palette(file_bytes, ptr)
             model["palette"] = palettes_dict
 
@@ -433,20 +432,20 @@ def read_group(file_bytes: bytes, ptr: int) -> tuple[Group, int]:
             grid = {}
             num_fixtures, ptr = _read_obj_list_len(file_bytes, ptr)
             for _ in range(num_fixtures):
-                fixture_id, ptr = _read_number(file_bytes, ptr)
+                fixture_id, ptr = _read_number(file_bytes, ptr, "group grid fixture_id")
                 if file_bytes[ptr] != 0x92:
                     raise ValueError(f"Error found in grid. Expected marker 0x92, found {hex(file_bytes[ptr])} instead")
                 ptr += 1
-                fixture_x, ptr = _read_number(file_bytes, ptr)
-                fixture_y, ptr = _read_number(file_bytes, ptr)
+                fixture_x, ptr = _read_number(file_bytes, ptr, "group fixture_x")
+                fixture_y, ptr = _read_number(file_bytes, ptr, "group fixture_y")
                 grid[fixture_id] = [fixture_x, fixture_y]
             group[attr_name] = grid
         elif attr_name == "steps":
             steps = {}
             num_steps, ptr = _read_obj_list_len(file_bytes, ptr)
             for _ in range(num_steps):
-                fixture_id, ptr = _read_number(file_bytes, ptr)
-                step, ptr = _read_number(file_bytes, ptr)
+                fixture_id, ptr = _read_number(file_bytes, ptr, "group steps fixture_id")
+                step, ptr = _read_number(file_bytes, ptr, "group step")
                 steps[fixture_id] = step
             group[attr_name] = steps
         else:
@@ -491,7 +490,6 @@ def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[UserPalette, int]:
     palette_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
 
     attributes = ["section", "user_palette_id", "name", "icon", "orders"]
-    num_attr_indicated = 5
     num_attr = 0
     while file_bytes[ptr] != 0x00:
         attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "user_palette", palette)

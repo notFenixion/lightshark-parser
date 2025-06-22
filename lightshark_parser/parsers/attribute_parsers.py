@@ -19,24 +19,55 @@ def _read_attribute_name(file_bytes: bytes, ptr: int, valid_attributes: list, se
     return attr_name, ptr + attr_name_len + 1
 
 
-def _read_number(file_bytes: bytes, ptr: int) -> tuple[int, int]:
-    # read_number_attribute but without needing an obj_dict
+# Global set to store unique markers
+_unique_markers = set()
+
+def _write_markers_to_file():
+    if _unique_markers:
+        with open('cc_markers_log.txt', 'a') as f:
+            for marker_info in sorted(_unique_markers):
+                f.write(f"{marker_info}\n")
+            f.write("-"*80 + "\n")
+
+def _read_number(file_bytes: bytes, ptr: int, attribute: str) -> tuple[int, int]:
     if file_bytes[ptr] <= 0xCB or file_bytes[ptr] > 0xCE:
         return file_bytes[ptr], ptr + 1
     else:
+        # marker = file_bytes[ptr]
+        # marker_hex = f"0x{marker:02X}"
+        # marker_info = f"Found {marker_hex} marker in _read_number for '{attribute}'"
+        # _unique_markers.add(marker_info)
         value_length = 2 ** (file_bytes[ptr] - 0xCC)
         value = int.from_bytes(file_bytes[ptr + 1 : ptr + 1 + value_length], "big")
         return value, ptr + value_length + 1
 
 
-def _read_number_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str, check: bytes = None) -> int:
+def _read_number_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str, check: bytes = None, obj_name: str = None) -> int:
     # If value is >= \xCC, it could be a length indicator for a value that is >255
     # NOTE: Might have edge cases that could cause this to break
     if file_bytes[ptr] <= 0xCB or file_bytes[ptr] > 0xCE:
         obj[attr_name] = file_bytes[ptr]
         return ptr + 1
     else:
-        # NOTE: this 2^ thing could be wrong
+        # Get the variable name from the calling frame's local variables
+        # import inspect
+        # frame = inspect.currentframe().f_back
+        # try:
+        #     # Look for the variable name in the caller's locals
+        #     for name, value in frame.f_locals.items():
+        #         if value is obj:
+        #             obj_name = name
+        #             break
+        #     else:
+        #         obj_name = 'unknown_dict'
+        # finally:
+        #     del frame  # Avoid reference cycles
+        
+        # marker = file_bytes[ptr]
+        # marker_hex = f"0x{marker:02X}"
+        # marker_info = f"Found {marker_hex} marker in dict '{obj_name}', attribute: {attr_name}"
+        # _unique_markers.add(marker_info)
+        
         value_length = 2 ** (file_bytes[ptr] - 0xCC)
         # If no check given assume that multibyte is correct
         if check is None:
@@ -141,3 +172,8 @@ def _obj_checker(initial_ptr: int, ptr: int, obj_bytelength: int, num_attr: int,
     logging.debug("Number of attributes found: %d, Expected: %d", num_attr, num_attr_indicated)
     if num_attr != num_attr_indicated:
         raise ValueError(f"Attribute count mismatch. Found {num_attr} attributes, expected {num_attr_indicated}")
+
+
+# Register the function to be called on program exit
+import atexit
+atexit.register(_write_markers_to_file)

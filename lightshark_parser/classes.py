@@ -2,6 +2,8 @@ from typing import Dict, List, Any, Optional, TypedDict
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
+from .serialisers.attribute_serialisers import *
+import logging
 
 
 class Lightshow:
@@ -231,8 +233,38 @@ class Lightshow:
         return format_lightshow(self)
 
     def to_bytes(self):
-        from .serialiser import serialise_lightshow
-        return serialise_lightshow(self)
+        logging.debug(f"Starting serialization of Lightshow object")
+        bytestr = bytearray()
+        if self._fileinfo is not None:
+            bytestr.extend(self._fileinfo.to_bytes())
+        bytestr.extend(section_header("#models#"))
+        if self._models is not None:
+            for model in self._models.values():
+                bytestr.extend(model.to_bytes())
+        return bytestr
+        if self._patches is not None:
+            for patch in self._patches.values():
+                bytestr.extend(patch.to_bytes())
+        if self._groups is not None:
+            for group in self._groups.values():
+                bytestr.extend(group.to_bytes())
+        if self._user_palettes is not None:
+            for palette in self._user_palettes.values():
+                bytestr.extend(palette.to_bytes())
+        if self._cues is not None:
+            for cue in self._cues.values():
+                bytestr.extend(cue.to_bytes())
+        if self._cuelists is not None:
+            for cuelist in self._cuelists.values():
+                bytestr.extend(cuelist.to_bytes())
+        if self._playbacks is not None:
+            for playback in self._playbacks.values():
+                bytestr.extend(playback.to_bytes())
+        if self._fxpalettes is not None:
+            for fxpalette in self._fxpalettes.values():
+                bytestr.extend(fxpalette.to_bytes())
+        if self._general is not None:
+            bytestr.extend(self._general.to_bytes())
 
 
 class FileInfo:
@@ -252,7 +284,30 @@ class FileInfo:
             }
 
         def to_bytes(self):
+            logging.debug(f"Starting serialization of FileInfo.Version object")
+            bytestr = bytearray(section_header("version"))
+
             content = bytearray()
+            num_attr = 0
+            for attr_name, value in self.__dict__.items():
+                if value is not None:
+                    content.extend(serialise_attr_name(attr_name))
+                    num_attr += 1
+
+                    if attr_name in ["subversion", "version"]:
+                        content.extend(serialise_num_value(value))
+                    elif attr_name == "autoload":
+                        content.extend(serialise_bool_value(value))
+                    elif attr_name == "software":
+                        content.extend(serialise_str_value(value))
+
+            content[0:0] = serialise_num_attr(num_attr)
+            
+            bytestr.extend(serialise_content_length(content))
+            bytestr.extend(content)
+            logging.info("FileInfo version object serialised")
+            logging.debug(bytestr)
+            return bytes(bytestr)
 
 
     def __init__(self, version: Optional[Version] = None):
@@ -262,7 +317,14 @@ class FileInfo:
         return {"version": self.version.to_dict() if self.version else None}
 
     def to_bytes(self):
-        content = bytearray()
+        logging.debug(f"Starting serialization of FileInfo section")
+        bytestr = bytearray(section_header("#fileinfo#"))
+        for obj in self.__dict__.values():
+            if obj is not None:
+                bytestr.extend(obj.to_bytes())
+        logging.info("FileInfo section serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
         
 
 
@@ -271,9 +333,35 @@ class FileInfo:
 class ModelPalette:
     color: Optional[str] = None
     icon: Optional[str] = None
-    values: Optional[List[Any]] = field(default_factory=list)
+    # Values List[int,int] corresponds to [ftype, value]
+    values: Optional[dict[int, int]] = None
     name: Optional[str] = None
-    type_id: Optional[int] = None
+    type_id: Optional[str] = None
+
+    def to_bytes(self):
+        logging.debug(f"Starting serialization of ModelPalette")
+        bytestr = bytearray()
+        num_attr = 0
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in ["name", "icon", "color", "type_id"]:
+                    bytestr.extend(serialise_str_value(attr_value))
+                elif attr_name == "values":
+                    num_values = len(attr_value)
+                    bytestr.extend(serialise_objlist_len(num_values))
+                    for ftype, value in attr_value.items():
+                        bytestr.extend(b'\x92')
+                        bytestr.extend(serialise_num_value(ftype, cc_check=True))
+                        bytestr.extend(serialise_num_value(value, cc_check=True))
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        
+        logging.info("ModelPalette object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 @dataclass
@@ -285,10 +373,55 @@ class ModelHardware:
     height: Optional[float] = None
 
 
+    def to_bytes(self):
+        logging.debug(f"Starting serialization of ModelHardware")
+        bytestr = bytearray()
+        num_attr = 0
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in ["width", "depth", "max_power", "weight", "height"]:
+                    bytestr.extend(serialise_num_value(attr_value))
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        
+        logging.info("ModelHardware object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
+
+
 @dataclass
 class MacroStep:
     ms_wait: Optional[int] = None
     values: Optional[List[Any]] = field(default_factory=list)
+
+    def to_bytes(self):
+        logging.debug(f"Starting serialization of MacroStep")
+        bytestr = bytearray()
+        num_attr = 0
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name == "ms_wait":
+                    bytestr.extend(serialise_num_value(attr_value))
+                elif attr_name == "values":
+                    num_values = len(attr_value)
+                    bytestr.extend(serialise_objlist_len(num_values))
+                    for value in attr_value:
+                        if len(value) != 2:
+                            raise ValueError("Value list must contain exactly 2 elements")
+                        bytestr.extend(serialise_str_value(value["name"]))
+                        bytestr.extend(serialise_num_value(value["value"]), cc_check=True)
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        
+        logging.info("MacroStep object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 @dataclass
@@ -296,6 +429,29 @@ class Macro:
     macro_type: Optional[str] = None
     steps: Optional[List[MacroStep]] = field(default_factory=list)
     name: Optional[str] = None
+
+    def to_bytes(self):
+        logging.debug(f"Starting serialization of Macro")
+        bytestr = bytearray()
+        num_attr = 0
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None and attr_name != "macro_type":
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name == "steps":
+                    num_steps = len(attr_value)
+                    bytestr.extend(serialise_objlist_len(num_steps))
+                    for step in attr_value:
+                        bytestr.extend(step.to_bytes())
+                elif attr_name == "name":
+                    bytestr.extend(serialise_str_value(attr_value))
+
+        bytestr[0:0] = serialise_str_name("macro_type") + serialise_num_attr(num_attr)
+        
+        logging.info("Macro object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 @dataclass
@@ -307,6 +463,27 @@ class ModelValueStep:
     max_str: Optional[str] = None
     symbol: Optional[str] = None
 
+    def to_bytes(self):
+        logging.debug(f"Starting serialization of ModelValueStep")
+        bytestr = bytearray()
+        num_attr = 0
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                num_attr += 1
+
+                if attr_name in ["step_name", "min_str", "max_str", "symbol"]:
+                    bytestr.extend(serialise_str_value(attr_value))
+                elif attr_name == "step_value":
+                    bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+
+        if num_attr != 5:
+            raise ValueError("ModelValueStep object should have exactly 5 attributes. (NOTE: Unconfirmed)")
+        bytestr[0:0] = serialise_objlist_len(num_attr)
+        
+        logging.info("ModelValueStep object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
+
 
 @dataclass
 class ModelValue:
@@ -315,16 +492,42 @@ class ModelValue:
     instant: Optional[bool] = None
     description: Optional[str] = None
     ftype: Optional[int] = None
-    steps: Optional[List[Any]] = field(default_factory=list)
+    steps: Optional[dict[int, ModelValueStep]] = field(default_factory=dict)
     htp: Optional[bool] = None
     size: Optional[int] = None
+
+    def to_bytes(self):
+        bytestr = bytearray()
+        num_attr = 0
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+                if attr_name in ["index", "ftype", "size"]:
+                    bytestr.extend(serialise_num_value(attr_value))
+                if attr_name in ["description"]:
+                    bytestr.extend(serialise_str_value(attr_value))
+                elif attr_name in ["inverse", "instant", "htp"]:
+                    bytestr.extend(serialise_bool_value(attr_value))
+                elif attr_name == "steps":
+                    num_steps = len(attr_value)
+                    bytestr.extend(serialise_objlist_len(num_steps, de_check=True))
+                    for id, step in attr_value.items():
+                        bytestr.extend(serialise_num_value(id))
+                        bytestr.extend(step.to_bytes())
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        
+        logging.info("ModelValue object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 class Model:
     def __init__(
         self,
         model_id: int,
-        palette: Optional[ModelPalette] = None,
+        palette: Optional[Dict[str, ModelPalette]] = None,
         name: Optional[str] = None,
         short_name: Optional[str] = None,
         default_inverted_pan: Optional[bool] = None,
@@ -339,19 +542,71 @@ class Model:
         size: Optional[int] = None,
     ) -> None:
         self.model_id = model_id
-        self.palette = palette if palette is not None else ModelPalette()
+        self.palette = palette
         self.name = name
         self.short_name = short_name
         self.default_inverted_pan = default_inverted_pan
         self.brand = brand
-        self.hardware = hardware if hardware is not None else ModelHardware()
-        self.macros = macros if macros is not None else []
+        self.hardware = hardware
+        self.macros = macros
         self.use_virtual_dimmer = use_virtual_dimmer
         self.default_inverted_tilt = default_inverted_tilt
-        self.values = values if values is not None else []
+        self.values = values
         self.mode_name = mode_name
         self.virtual_dimmer_channels = virtual_dimmer_channels if virtual_dimmer_channels is not None else []
         self.size = size
+
+    def to_bytes(self):
+        logging.debug(f"Starting serialization of Model {getattr(self, 'name', '')} (id: {getattr(self, 'model_id', 'N/A')})")
+        bytestr = bytearray(section_header("model"))
+
+        content = bytearray()
+        num_attr = 0
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in ["model_id", "size"]:
+                    content.extend(serialise_num_value(attr_value))
+                elif attr_name in ["default_inverted_pan", 'default_inverted_tilt', 'use_virtual_dimmer']:
+                    content.extend(serialise_bool_value(attr_value))
+                elif attr_name in ["name", "short_name", "brand", "mode_name"]:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name == "palette":
+                    num_palettes = len(attr_value)
+                    content.extend(serialise_objlist_len(num_palettes, de_check=True))
+                    for palette_id, palette in attr_value.items():
+                        content.extend(serialise_num_value(int(palette_id)))
+                        content.extend(palette.to_bytes())
+                elif attr_name == "hardware":
+                    content.extend(attr_value.to_bytes())
+                elif attr_name == "macros":
+                    num_macros = len(attr_value)
+                    content.extend(serialise_objlist_len(num_macros, de_check=True))
+                    for macro in attr_value:
+                        content.extend(macro.to_bytes())
+                elif attr_name == "values":
+                    num_values = len(attr_value)
+                    has_virtual_intensity = any(value.description == "Intensity (Virtual)" for value in attr_value)
+                    if has_virtual_intensity:
+                        num_values -= 1
+                    
+                    content.extend(serialise_objlist_len(num_values))
+                    for value in attr_value:
+                        if value.description == "Intensity (Virtual)":
+                            continue
+                        content.extend(value.to_bytes())
+                elif attr_name == "virtual_dimmer_channels":
+                    content.extend(serialise_num_list(attr_value))
+
+        content[0:0] = serialise_num_attr(num_attr)
+        
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("Model object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 class Patch:
@@ -378,7 +633,7 @@ class Patch:
         self.model_id: Optional[int] = model_id
         self.inverse_tilt: Optional[bool] = inverse_tilt
         self.name: Optional[str] = name
-        self.channels_ftype: List[str] = channels_ftype if channels_ftype is not None else []
+        self.channels_ftype: List[str] = channels_ftype
         self.index: Optional[int] = index
         self.universe: Optional[int] = universe
         self.description: Optional[str] = description
@@ -386,9 +641,9 @@ class Patch:
         self.visual_id: Optional[int] = visual_id
         self.parked: Optional[bool] = parked
         self.color_mark: Optional[int] = color_mark
-        self.dimmer: List[int] = dimmer if dimmer is not None else []
+        self.dimmer: List[int] = dimmer
         self.swap_pan_tilt: Optional[bool] = swap_pan_tilt
-        self.virtual_dimmer: List[int] = virtual_dimmer if virtual_dimmer is not None else []
+        self.virtual_dimmer: List[int] = virtual_dimmer
         self.id: Optional[int] = id
         self.size: Optional[int] = size
         self.frozen: Optional[int] = frozen
