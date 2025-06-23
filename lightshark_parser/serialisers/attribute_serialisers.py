@@ -1,6 +1,6 @@
 
 
-def section_header(section_name: str) -> bytes:
+def serialise_section_header(section_name: str) -> bytes:
     return (
         (len(section_name)+1).to_bytes(4, "big") +
         (len(section_name) + 0xA0).to_bytes(1, "big") +
@@ -11,11 +11,14 @@ def serialise_attr_name(attr_name: str) -> bytes:
     return (len(attr_name) + 0xA0).to_bytes(1, "big") + attr_name.encode("utf-8")
 
 def serialise_num_attr(num_attr: int) -> bytes:
-    return (num_attr + 0x80).to_bytes(1, "big")
+    if num_attr < 16:
+        return (num_attr + 0x80).to_bytes(1, "big")
+    else:
+        return (0xDE).to_bytes(1, "big") + num_attr.to_bytes(2, "big")
 
 def serialise_num_value(num_value: int, cc_check: bool = False) -> bytes:
     # NOTE: threshold unconfirmed
-    threshold = 0xBF if cc_check else 0xFF
+    threshold = 0x79 if cc_check else 0xFF
     if num_value <= threshold:
         return num_value.to_bytes(1, "big")
     else:
@@ -35,12 +38,12 @@ def serialise_str_value(str_value: str) -> bytes:
         return (0xDA).to_bytes(1, "big") + str_len.to_bytes(2, "big") + str_value.encode("utf-8")
 
 
-def serialise_objlist_len(objlist_len: int, de_check: bool = False) -> bytes:
+def serialise_objlist_len(objlist_len: int) -> bytes:
 
     if objlist_len < 16:
-        return (objlist_len + (0x80 if de_check else 0x90)).to_bytes(1, "big")
+        return (objlist_len + 0x90).to_bytes(1, "big")
     else:
-        return (0xDE if de_check else 0xDC).to_bytes(1, "big") + objlist_len.to_bytes(2, "big")
+        return (0xDC).to_bytes(1, "big") + objlist_len.to_bytes(2, "big")
 
 
 def serialise_num_list(list_value: list[int], cc_check: bool = False) -> bytes:

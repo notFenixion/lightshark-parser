@@ -237,34 +237,48 @@ class Lightshow:
         bytestr = bytearray()
         if self._fileinfo is not None:
             bytestr.extend(self._fileinfo.to_bytes())
-        bytestr.extend(section_header("#models#"))
+
+        bytestr.extend(serialise_section_header("#models#"))
         if self._models is not None:
             for model in self._models.values():
-                bytestr.extend(model.to_bytes())
-        return bytestr
+                bytestr.extend(model.to_bytes()) 
+
+        bytestr.extend(serialise_section_header("#patching#"))
         if self._patches is not None:
             for patch in self._patches.values():
                 bytestr.extend(patch.to_bytes())
         if self._groups is not None:
             for group in self._groups.values():
                 bytestr.extend(group.to_bytes())
+        
+        bytestr.extend(serialise_section_header("#user_palettes#"))
         if self._user_palettes is not None:
             for palette in self._user_palettes.values():
                 bytestr.extend(palette.to_bytes())
+
+        bytestr.extend(serialise_section_header("#cues#"))
         if self._cues is not None:
             for cue in self._cues.values():
                 bytestr.extend(cue.to_bytes())
+        
+        bytestr.extend(serialise_section_header("#cuelists#"))
         if self._cuelists is not None:
             for cuelist in self._cuelists.values():
                 bytestr.extend(cuelist.to_bytes())
+        
+        bytestr.extend(serialise_section_header("#playbacks"))
         if self._playbacks is not None:
             for playback in self._playbacks.values():
                 bytestr.extend(playback.to_bytes())
+
+        bytestr.extend(serialise_section_header("#fxpalettes#"))
         if self._fxpalettes is not None:
             for fxpalette in self._fxpalettes.values():
                 bytestr.extend(fxpalette.to_bytes())
         if self._general is not None:
             bytestr.extend(self._general.to_bytes())
+        
+        return bytestr
 
 
 class FileInfo:
@@ -285,20 +299,25 @@ class FileInfo:
 
         def to_bytes(self):
             logging.debug(f"Starting serialization of FileInfo.Version object")
-            bytestr = bytearray(section_header("version"))
+            bytestr = bytearray(serialise_section_header("version"))
 
             content = bytearray()
             num_attr = 0
+            
+            num_attrs = ["subversion", "version"]
+            bool_attrs = ["autoload"]
+            string_attrs = ["software"]
+            
             for attr_name, value in self.__dict__.items():
                 if value is not None:
                     content.extend(serialise_attr_name(attr_name))
                     num_attr += 1
 
-                    if attr_name in ["subversion", "version"]:
+                    if attr_name in num_attrs:
                         content.extend(serialise_num_value(value))
-                    elif attr_name == "autoload":
+                    elif attr_name in bool_attrs:
                         content.extend(serialise_bool_value(value))
-                    elif attr_name == "software":
+                    elif attr_name in string_attrs:
                         content.extend(serialise_str_value(value))
 
             content[0:0] = serialise_num_attr(num_attr)
@@ -318,7 +337,7 @@ class FileInfo:
 
     def to_bytes(self):
         logging.debug(f"Starting serialization of FileInfo section")
-        bytestr = bytearray(section_header("#fileinfo#"))
+        bytestr = bytearray(serialise_section_header("#fileinfo#"))
         for obj in self.__dict__.values():
             if obj is not None:
                 bytestr.extend(obj.to_bytes())
@@ -338,16 +357,19 @@ class ModelPalette:
     name: Optional[str] = None
     type_id: Optional[str] = None
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of ModelPalette")
         bytestr = bytearray()
         num_attr = 0
+        
+        string_attrs = ["name", "icon", "color", "type_id"]
+        
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
                 bytestr.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 
-                if attr_name in ["name", "icon", "color", "type_id"]:
+                if attr_name in string_attrs:
                     bytestr.extend(serialise_str_value(attr_value))
                 elif attr_name == "values":
                     num_values = len(attr_value)
@@ -366,23 +388,26 @@ class ModelPalette:
 
 @dataclass
 class ModelHardware:
-    width: Optional[float] = None
-    depth: Optional[float] = None
-    max_power: Optional[float] = None
-    weight: Optional[float] = None
-    height: Optional[float] = None
+    width: Optional[int] = None
+    depth: Optional[int] = None
+    max_power: Optional[int] = None
+    weight: Optional[int] = None
+    height: Optional[int] = None
 
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of ModelHardware")
         bytestr = bytearray()
         num_attr = 0
+        
+        num_attrs = ["width", "depth", "max_power", "weight", "height"]
+        
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
                 bytestr.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 
-                if attr_name in ["width", "depth", "max_power", "weight", "height"]:
+                if attr_name in num_attrs:
                     bytestr.extend(serialise_num_value(attr_value))
 
         bytestr[0:0] = serialise_num_attr(num_attr)
@@ -397,16 +422,19 @@ class MacroStep:
     ms_wait: Optional[int] = None
     values: Optional[List[Any]] = field(default_factory=list)
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of MacroStep")
         bytestr = bytearray()
         num_attr = 0
+        
+        num_attrs = ["ms_wait"]
+        
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
                 bytestr.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 
-                if attr_name == "ms_wait":
+                if attr_name in num_attrs:
                     bytestr.extend(serialise_num_value(attr_value))
                 elif attr_name == "values":
                     num_values = len(attr_value)
@@ -430,22 +458,31 @@ class Macro:
     steps: Optional[List[MacroStep]] = field(default_factory=list)
     name: Optional[str] = None
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of Macro")
         bytestr = bytearray()
         num_attr = 0
+        
+        string_attrs = ["name", "macro_type"]
+        
         for attr_name, attr_value in self.__dict__.items():
-            if attr_value is not None and attr_name != "macro_type":
+            if attr_value is not None and attr_name != "macro_type":  # macro_type is handled separately
                 bytestr.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 
-                if attr_name == "steps":
+                if attr_name in string_attrs:
+                    bytestr.extend(serialise_str_value(attr_value))
+                elif attr_name == "steps":
                     num_steps = len(attr_value)
                     bytestr.extend(serialise_objlist_len(num_steps))
                     for step in attr_value:
                         bytestr.extend(step.to_bytes())
-                elif attr_name == "name":
-                    bytestr.extend(serialise_str_value(attr_value))
+        
+        # Handle macro_type separately as it's a special case
+        if self.macro_type is not None:
+            bytestr.extend(serialise_attr_name("macro_type"))
+            bytestr.extend(serialise_str_value(self.macro_type))
+            num_attr += 1
 
         bytestr[0:0] = serialise_str_name("macro_type") + serialise_num_attr(num_attr)
         
@@ -463,17 +500,21 @@ class ModelValueStep:
     max_str: Optional[str] = None
     symbol: Optional[str] = None
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of ModelValueStep")
         bytestr = bytearray()
         num_attr = 0
+        
+        string_attrs = ["step_name", "min_str", "max_str", "symbol"]
+        num_attrs = ["step_value"]
+        
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
                 num_attr += 1
 
-                if attr_name in ["step_name", "min_str", "max_str", "symbol"]:
+                if attr_name in string_attrs:
                     bytestr.extend(serialise_str_value(attr_value))
-                elif attr_name == "step_value":
+                elif attr_name in num_attrs:
                     bytestr.extend(serialise_num_value(attr_value, cc_check=True))
 
         if num_attr != 5:
@@ -496,22 +537,28 @@ class ModelValue:
     htp: Optional[bool] = None
     size: Optional[int] = None
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         bytestr = bytearray()
         num_attr = 0
+        
+        num_attrs = ["index", "ftype", "size"]
+        string_attrs = ["description"]
+        bool_attrs = ["inverse", "instant", "htp"]
+        
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
                 bytestr.extend(serialise_attr_name(attr_name))
                 num_attr += 1
-                if attr_name in ["index", "ftype", "size"]:
+                
+                if attr_name in num_attrs:
                     bytestr.extend(serialise_num_value(attr_value))
-                if attr_name in ["description"]:
+                elif attr_name in string_attrs:
                     bytestr.extend(serialise_str_value(attr_value))
-                elif attr_name in ["inverse", "instant", "htp"]:
+                elif attr_name in bool_attrs:
                     bytestr.extend(serialise_bool_value(attr_value))
                 elif attr_name == "steps":
                     num_steps = len(attr_value)
-                    bytestr.extend(serialise_objlist_len(num_steps, de_check=True))
+                    bytestr.extend(serialise_num_attr(num_steps))
                     for id, step in attr_value.items():
                         bytestr.extend(serialise_num_value(id))
                         bytestr.extend(step.to_bytes())
@@ -553,29 +600,33 @@ class Model:
         self.default_inverted_tilt = default_inverted_tilt
         self.values = values
         self.mode_name = mode_name
-        self.virtual_dimmer_channels = virtual_dimmer_channels if virtual_dimmer_channels is not None else []
+        self.virtual_dimmer_channels = virtual_dimmer_channels
         self.size = size
 
     def to_bytes(self):
         logging.debug(f"Starting serialization of Model {getattr(self, 'name', '')} (id: {getattr(self, 'model_id', 'N/A')})")
-        bytestr = bytearray(section_header("model"))
-
+        bytestr = bytearray(serialise_section_header("model"))
         content = bytearray()
         num_attr = 0
+        
+        num_attrs = ["model_id", "size"]
+        bool_attrs = ["default_inverted_pan", "default_inverted_tilt", "use_virtual_dimmer"]
+        string_attrs = ["name", "short_name", "brand", "mode_name"]
+        
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
                 content.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 
-                if attr_name in ["model_id", "size"]:
+                if attr_name in num_attrs:
                     content.extend(serialise_num_value(attr_value))
-                elif attr_name in ["default_inverted_pan", 'default_inverted_tilt', 'use_virtual_dimmer']:
+                elif attr_name in bool_attrs:
                     content.extend(serialise_bool_value(attr_value))
-                elif attr_name in ["name", "short_name", "brand", "mode_name"]:
+                elif attr_name in string_attrs:
                     content.extend(serialise_str_value(attr_value))
                 elif attr_name == "palette":
                     num_palettes = len(attr_value)
-                    content.extend(serialise_objlist_len(num_palettes, de_check=True))
+                    content.extend(serialise_num_attr(num_palettes))
                     for palette_id, palette in attr_value.items():
                         content.extend(serialise_num_value(int(palette_id)))
                         content.extend(palette.to_bytes())
@@ -583,7 +634,7 @@ class Model:
                     content.extend(attr_value.to_bytes())
                 elif attr_name == "macros":
                     num_macros = len(attr_value)
-                    content.extend(serialise_objlist_len(num_macros, de_check=True))
+                    content.extend(serialise_num_attr(num_macros))
                     for macro in attr_value:
                         content.extend(macro.to_bytes())
                 elif attr_name == "values":
@@ -633,7 +684,7 @@ class Patch:
         self.model_id: Optional[int] = model_id
         self.inverse_tilt: Optional[bool] = inverse_tilt
         self.name: Optional[str] = name
-        self.channels_ftype: List[str] = channels_ftype
+        self.channels_ftype: List[int] = channels_ftype
         self.index: Optional[int] = index
         self.universe: Optional[int] = universe
         self.description: Optional[str] = description
@@ -669,6 +720,46 @@ class Patch:
             "frozen": self.frozen,
         }
 
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of Patch object {self.name} (ID: {self.id})")
+        bytestr = bytearray(serialise_section_header("patch"))
+
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = ["model_id", "index", "universe", "visual_id", "color_mark", "id", "size", "frozen"]
+        string_attrs = ["name", "description"]
+        bool_attrs = ["inverse_tilt", "inverse_pan", "parked", "swap_pan_tilt"]
+        num_list_attrs = ["channels_ftype", "virtual_dimmer"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in string_attrs:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name in bool_attrs:
+                    content.extend(serialise_bool_value(attr_value))
+                elif attr_name in num_list_attrs:
+                    content.extend(serialise_num_list(attr_value, cc_check=True))
+                elif attr_name == "dimmer":
+                    if len(attr_value) != 8:
+                        raise ValueError("dimmer should contain exactly 8 elements (NOTE: unconfirmed)")
+                    dimmer_content = bytearray(serialise_num_list(attr_value))
+                    dimmer_content[0] = 0xCB  # Convert to integer for bytearray assignment
+                    content.extend(dimmer_content)
+
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("Patch object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
+
 
 class Group:
     def __init__(
@@ -685,9 +776,9 @@ class Group:
         self.description: Optional[str] = description
         self.color_mark: Optional[int] = color_mark
         self.visual_id: Optional[int] = visual_id
-        self.patched_elements_ids: List[int] = patched_elements_ids if patched_elements_ids is not None else []
-        self.grid: Dict[int, List[int]] = grid if grid is not None else {}
-        self.steps: Dict[int, int] = steps if steps is not None else {}
+        self.patched_elements_ids: List[int] = patched_elements_ids
+        self.grid: Dict[int, List[int]] = grid
+        self.steps: Dict[int, int] = steps
         self.automatico: Optional[bool] = automatico
         self.group_id: Optional[int] = group_id
 
@@ -703,6 +794,49 @@ class Group:
             "group_id": self.group_id,
         }
 
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of Group object {self.description} (id: {self.group_id})")
+        bytestr = bytearray(serialise_section_header("group"))
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = ["group_id", "visual_id", "color_mark"]
+        string_attrs = ["description"]
+        bool_attrs = ["automatico"]
+        num_list_attrs = ["patched_elements_ids"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value))
+                elif attr_name in string_attrs:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name in bool_attrs:
+                    content.extend(serialise_bool_value(attr_value))
+                elif attr_name in num_list_attrs:
+                    content.extend(serialise_num_list(attr_value, cc_check=True))
+                elif attr_name == "grid":
+                    num_fixtures = len(attr_value)
+                    content.extend(serialise_num_attr(num_fixtures))
+                    for fixture_id, fixture_pos in attr_value.items():
+                        content.extend(serialise_num_value(int(fixture_id)))
+                        content.extend(serialise_num_list(fixture_pos))
+                elif attr_name in ["steps"]:
+                    num_steps = len(attr_value)
+                    content.extend(serialise_num_attr(num_steps))
+                    for step_id, step in attr_value.items():
+                        content.extend(serialise_num_value(int(step_id)))
+                        content.extend(serialise_num_value(step))
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("Group object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 class UserPalette:
     def __init__(
@@ -717,7 +851,7 @@ class UserPalette:
         self.user_palette_id: int = user_palette_id
         self.name: str = name
         self.icon: str = icon
-        self.orders: List["Order"] = orders if orders is not None else []
+        self.orders: List["Order"] = orders
 
     def to_dict(self) -> dict:
         return {
@@ -728,6 +862,37 @@ class UserPalette:
             "orders": [order.to_dict() if hasattr(order, "to_dict") else order for order in self.orders],
         }
 
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of UserPalette object {self.name} (id: {self.user_palette_id})")
+        bytestr = bytearray(serialise_section_header("user_palette"))
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = ["section", "user_palette_id"]
+        string_attrs = ["name", "icon"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value))
+                elif attr_name in string_attrs:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name == "orders":
+                    num_orders = len(attr_value)
+                    content.extend(serialise_objlist_len(num_orders))
+                    for order in attr_value:
+                        content.extend(order.to_bytes())
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("UserPalette object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
+
 
 class Order:
     def __init__(
@@ -737,7 +902,7 @@ class Order:
         section: int = None,
         receptor_type: int = None,
         patch_id: int = None,
-        ftype: str = None,
+        ftype: int = None,
         value: int = None,
         channel: int = None,
     ) -> None:
@@ -746,7 +911,7 @@ class Order:
         self.section: int = section
         self.receptor_type: int = receptor_type
         self.patch_id: int = patch_id
-        self.ftype: str = ftype
+        self.ftype: int = ftype
         self.value: int = value
         self.channel: int = channel
 
@@ -762,42 +927,50 @@ class Order:
             "channel": self.channel,
         }
 
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of Order object for palette ID: {self.palette_id})")
+        bytestr = bytearray()
+        num_attr = 0
+        
+        num_attrs = ["palette_id", "universe", "section", "receptor_type", "ftype", "patch_id", "value", "channel"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        logging.info("Order object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 class Cue:
     def __init__(
         self,
-        fx_palette: int = None,
-        cue_id: int = None,
-        description: str = None,
-        visual_id: int = None,
-        fxs: List["FX"] = None,
-        fxs_channels: List[dict] = None,
-        orders: List[Order] = None,
-        actions: List["Action"] = None,
-        name: str = None,
+        fx_palette: Optional[int] = None,
+        cue_id: Optional[int] = None,
+        description: Optional[str] = None,
+        visual_id: Optional[int] = None,
+        fxs: Optional[List["FX"]] = None,
+        fxs_channels: Optional[List[Dict[int, Any]]] = None,
+        orders: Optional[List[Order]] = None,
+        actions: Optional[List["Action"]] = None,
+        name: Optional[str] = None,
     ) -> None:
         self.fx_palette: int = fx_palette
         self.cue_id: int = cue_id
         self.description: str = description
         self.visual_id: int = visual_id
-        self.fxs: List["FX"] = fxs if fxs is not None else []
-        self.fxs_channels: List[dict] = fxs_channels if fxs_channels is not None else []
-        self.orders: List[Order] = orders if orders is not None else []
-        self.actions: List["Action"] = actions if actions is not None else []
+        self.fxs: List["FX"] = fxs
+        self.fxs_channels: List[dict] = fxs_channels
+        self.orders: List[Order] = orders
+        self.actions: List["Action"] = actions
         self.name: str = name
 
     def to_dict(self) -> dict:
-        def convert_bytes(obj):
-            if isinstance(obj, bytes):
-                # Convert bytes to a string of Unicode escape sequences (e.g., b'\x02\x04' -> '\\u0002\\u0004')
-                return "".join(f"\\u{byte:04x}" for byte in obj)
-            elif isinstance(obj, dict):
-                return {str(k): convert_bytes(v) for k, v in obj.items()}
-            elif isinstance(obj, (list, tuple)):
-                return [convert_bytes(item) for item in obj]
-            return obj
-
-        converted_fxs_channels = convert_bytes(self.fxs_channels)
         fxs_list = []
         for fx in self.fxs:
             if hasattr(fx, "to_dict"):
@@ -807,7 +980,6 @@ class Cue:
             else:
                 fxs_list.append(fx)
 
-        # Convert orders
         orders_list = []
         for order in self.orders:
             if hasattr(order, "to_dict"):
@@ -824,10 +996,74 @@ class Cue:
             "visual_id": self.visual_id,
             "actions": self.actions,
             "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
-            "fxs_channels": converted_fxs_channels,
+            "fxs_channels": self.fxs_channels,
             "orders": orders_list,
             "name": self.name,
         }
+
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of Cue object {self.name} (id: {self.cue_id})")
+        bytestr = bytearray(serialise_section_header("cue"))
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = ["cue_id", "visual_id"]
+        string_attrs = ["description", "name"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_name == "fx_palette" or attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+                
+                if attr_name == "fx_palette":
+                    if attr_value is None:
+                        content.extend(b'\xFF')
+                    else:
+                        content.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in string_attrs:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name == 'fxs_channels':
+                    num_lists = len(attr_value)
+                    content.extend(serialise_objlist_len(num_lists))
+                    for fx_channel in attr_value:
+                        list_content = bytearray()
+                        list_len = sum(1 for value in fx_channel if not isinstance(value, str))
+                        if list_len != 16:
+                            raise ValueError("FX channel list length should be 16 (NOTE: unconfirmed. though this error shouldn't happen either way...)")
+                        list_content.extend(serialise_objlist_len(list_len))
+                        for value in fx_channel:
+                            # \xd1 \x?? instances
+                            if isinstance(value, str):
+                                list_content.extend(bytes.fromhex(value))
+                            else:
+                                list_content.extend(serialise_num_value(value, cc_check=True))
+                        content.extend(list_content)
+
+                elif attr_name == 'fxs':
+                    num_fxs = len(attr_value)
+                    content.extend(serialise_objlist_len(num_fxs))
+                    for fx in attr_value:
+                        content.extend(fx.to_bytes())
+                elif attr_name == 'orders':
+                    num_orders = len(attr_value)
+                    content.extend(serialise_objlist_len(num_orders))
+                    for order in attr_value:
+                        content.extend(order.to_bytes())
+                elif attr_name == 'actions':
+                    raise NotImplementedError("Actions not implemented yet")
+                    # num_actions = len(attr_value)
+                    # bytestr.extend(serialise_objlist_len(num_actions))
+                    # for action in attr_value:
+                    #     bytestr.extend(action.to_bytes())
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("Cue object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 class FX:
@@ -847,8 +1083,8 @@ class FX:
             self.phase_offset: int = phase_offset
             self.section: int = section
             self.curve: int = curve
-            self.steps: List["FX.FXLayerSteps"] = steps if steps is not None else []
-            self.ftypes: List[str] = ftypes if ftypes is not None else []
+            self.steps: List["FX.FXLayerSteps"] = steps
+            self.ftypes: List[int] = ftypes
             self.id: int = id
             self.size: int = size
 
@@ -872,6 +1108,37 @@ class FX:
                 "id": self.id,
                 "size": self.size,
             }
+
+        def to_bytes(self) -> bytes:
+            logging.debug(f"Starting serialization of FXLayer object {self.id}")
+            bytestr = bytearray()
+            num_attr = 0
+            
+            num_attrs = ["id", "phase_offset", "section", "curve"]
+            bool_attrs = ["blind"]
+            num_list_attrs = ["ftypes"]
+            
+            for attr_name, attr_value in self.__dict__.items():
+                if attr_value is not None:
+                    bytestr.extend(serialise_attr_name(attr_name))
+                    num_attr += 1
+
+                    if attr_name in num_attrs:
+                        bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                    elif attr_name in bool_attrs:
+                        bytestr.extend(serialise_bool_value(attr_value))
+                    elif attr_name in num_list_attrs:
+                        bytestr.extend(serialise_num_list(attr_value, cc_check=True))
+                    elif attr_name == "steps":
+                        num_steps = len(attr_value)
+                        bytestr.extend(serialise_objlist_len(num_steps))
+                        for step in attr_value:
+                            bytestr.extend(step.to_bytes())
+
+            bytestr[0:0] = serialise_num_attr(num_attr)
+            logging.info("FXLayer object serialised")
+            logging.debug(bytestr)
+            return bytes(bytestr)
 
     class FXLayerStep:
         def __init__(
@@ -918,6 +1185,32 @@ class FX:
                 "jumps": self.jumps,
             }
 
+        def to_bytes(self) -> bytes:
+            logging.debug(f"Starting serialization of FXLayerStep object {self.name}")
+            bytestr = bytearray()
+            num_attr = 0
+            
+            num_attrs = [
+                "start_limit", "palette_type", "ancho", "curve_in", "curve_out",
+                "strength", "curve_type", "palette_value", "inicio", "end_limit", "jumps"
+            ]
+            string_attrs = ["name"]
+            
+            for attr_name, attr_value in self.__dict__.items():
+                if attr_value is not None:
+                    bytestr.extend(serialise_attr_name(attr_name))
+                    num_attr += 1
+
+                    if attr_name in num_attrs:
+                        bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                    elif attr_name in string_attrs:
+                        bytestr.extend(serialise_str_value(attr_value))
+
+            bytestr[0:0] = serialise_num_attr(num_attr)
+            logging.info("FXLayerStep object serialised")
+            logging.debug(bytestr)
+            return bytes(bytestr)
+
     def __init__(
         self,
         cyclos: int = None,
@@ -945,81 +1238,97 @@ class FX:
         repeats: int = None,
         rect_height: int = None,
     ) -> None:
-        # Single byte attributes
+        # Attributes ordered to match to_dict()
         self.cyclos: int = cyclos
         self.direction: int = direction
+        self.speed: int = speed
         self.group_steps: int = group_steps
+        self.size: int = size
+        self.layers: List[FX.FXLayer] = layers
+        self.patches: List[int] = patches
+        self.speed_in_bpm: bool = speed_in_bpm
+        self.width: int = width
+        self.spread: int = spread
+        self.basic: bool = basic
         self.gfxid: int = gfxid
+        self.internal_speed: int = internal_speed
+        self.fx_ref: int = fx_ref
         self.splits: int = splits
+        self.groups: List[int] = groups
         self.rect_width: int = rect_width
+        self.name: str = name
+        self.phase_offset: int = phase_offset
+        self.bpm: int = bpm
         self.render_id: int = render_id
         self.mode: int = mode
         self.repeats: int = repeats
         self.rect_height: int = rect_height
-        # Multibyte attributes
-        self.speed: int = speed
-        self.size: int = size
-        self.width: int = width
-        self.spread: int = spread
-        self.internal_speed: int = internal_speed
-        self.fx_ref: int = fx_ref
-        self.phase_offset: int = phase_offset
-        self.bpm: int = bpm
-        # String attribute
-        self.name: str = name
-        # Boolean attributes
-        self.speed_in_bpm: bool = speed_in_bpm
-        self.basic: bool = basic
-        # List attributes
-        self.patches: List[int] = patches if patches is not None else []
-        self.groups: List[int] = groups if groups is not None else []
-
-        # Object attributes
-        self.layers: List[FX.FXLayer] = layers if layers is not None else []
 
     def to_dict(self) -> dict:
-        # Convert layers to their dictionary representation
-        layers_list = []
-        for layer in self.layers:
-            if hasattr(layer, "to_dict"):
-                layers_list.append(layer.to_dict())
-            elif hasattr(layer, "__dict__"):
-                layers_list.append(layer.__dict__)
-            else:
-                layers_list.append(layer)
-
         return {
-            # Single byte attributes
-            "cyclos": self.cyclos,
-            "direction": self.direction,
-            "group_steps": self.group_steps,
-            "gfxid": self.gfxid,
-            "splits": self.splits,
-            "rect_width": self.rect_width,
-            "render_id": self.render_id,
-            "mode": self.mode,
-            "repeats": self.repeats,
-            "rect_height": self.rect_height,
-            # Multibyte attributes
-            "speed": self.speed,
-            "size": self.size,
-            "width": self.width,
-            "spread": self.spread,
-            "internal_speed": self.internal_speed,
-            "fx_ref": self.fx_ref,
-            "phase_offset": self.phase_offset,
-            "bpm": self.bpm,
-            # String attribute
-            "name": self.name,
-            # Boolean attributes
-            "speed_in_bpm": self.speed_in_bpm,
-            "basic": self.basic,
-            # List attributes
-            "patches": self.patches,
-            "groups": self.groups,
-            # Object attributes
-            "layers": [layer.to_dict() for layer in self.layers] if hasattr(self, "layers") else [],
-        }
+        "cyclos": self.cyclos,
+        "direction": self.direction,
+        "speed": self.speed,
+        "group_steps": self.group_steps,
+        "size": self.size,
+        "layers": [layer.to_dict() for layer in self.layers] if self.layers else [],
+        "patches": self.patches,
+        "speed_in_bpm": self.speed_in_bpm,
+        "width": self.width,
+        "spread": self.spread,
+        "basic": self.basic,
+        "gfxid": self.gfxid,
+        "internal_speed": self.internal_speed,
+        "fx_ref": self.fx_ref,
+        "splits": self.splits,
+        "groups": self.groups,
+        "rect_width": self.rect_width,
+        "name": self.name,
+        "phase_offset": self.phase_offset,
+        "bpm": self.bpm,
+        "render_id": self.render_id,
+        "mode": self.mode,
+        "repeats": self.repeats,
+        "rect_height": self.rect_height
+    }
+
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of FX object {self.name}")
+        bytestr = bytearray()
+        num_attr = 0
+        
+        num_attrs = [
+            "cyclos", "direction", "group_steps", "gfxid", "splits", "rect_width",
+            "render_id", "mode", "repeats", "rect_height", "speed", "size",
+            "width", "spread", "internal_speed", "fx_ref", "phase_offset", "bpm"
+        ]
+        bool_attrs = ["speed_in_bpm", "basic"]
+        string_attrs = ["name"]
+        num_list_attrs = ["patches", "groups"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in bool_attrs:
+                    bytestr.extend(serialise_bool_value(attr_value))
+                elif attr_name in string_attrs:
+                    bytestr.extend(serialise_str_value(attr_value))
+                elif attr_name in num_list_attrs:
+                    bytestr.extend(serialise_num_list(attr_value))
+                elif attr_name == "layers":
+                    num_layers = len(attr_value)
+                    bytestr.extend(serialise_objlist_len(num_layers))
+                    for layer in attr_value:
+                        bytestr.extend(layer.to_bytes())
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        logging.info("FX object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 class Cuelist:
@@ -1059,6 +1368,32 @@ class Cuelist:
                 "halt": self.halt,
             }
 
+        def to_bytes(self) -> bytes:
+            logging.debug(f"Starting serialization of CuelistElement object {self.cue_id}")
+            bytestr = bytearray()
+            num_attr = 0
+            
+            num_attrs = [
+                "ms_fadeout", "cue_id", "ms_delay", "next", "ms_fadein", "ms_crossfade",
+                "ms_duration"
+            ]
+            bool_attrs = ["halt"]
+            
+            for attr_name, attr_value in self.__dict__.items():
+                if attr_value is not None:
+                    bytestr.extend(serialise_attr_name(attr_name))
+                    num_attr += 1
+
+                    if attr_name in num_attrs:
+                        bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                    elif attr_name in bool_attrs:
+                        bytestr.extend(serialise_bool_value(attr_value))
+
+            bytestr[0:0] = serialise_num_attr(num_attr)
+            logging.info("CuelistElement object serialised")
+            logging.debug(bytestr)
+            return bytes(bytestr)
+
     def __init__(
         self,
         ms_flash_attack: Optional[int] = None,
@@ -1068,48 +1403,47 @@ class Cuelist:
         chase: Optional[bool] = None,
         ms_chase_time: Optional[int] = None,
         visual_id: Optional[int] = None,
-        bpm_chase: Optional[bool] = None,
+        bpm_chase: Optional[int] = None,
         ms_flash_decay: Optional[int] = None,
-        pcrossfade: Optional[bool] = None,
+        pcrossfade: Optional[int] = None,
         ms_fadeout: Optional[int] = None,
         direction: Optional[int] = None,
         at_end_stop: Optional[bool] = None,
-        flash_mode: Optional[bool] = None,
+        flash_mode: Optional[int] = None,
         cuelist_id: Optional[int] = None,
         ms_fadein: Optional[int] = None,
         ms_crossfade: Optional[int] = None,
         no_first_fade: Optional[bool] = None,
         name: Optional[str] = None,
         block_fx: Optional[bool] = None,
-        cuelist_elements: Optional[List[Dict]] = None,
+        cuelist_elements: Optional[List[CuelistElement]] = None,
         ms_flash_hold: Optional[int] = None,
         ms_stop_time: Optional[int] = None,
     ) -> None:
+        # Match the order from to_dict()
         self.ms_flash_attack: Optional[int] = ms_flash_attack
-        self.ms_flash_decay: Optional[int] = ms_flash_decay
-        self.ms_flash_hold: Optional[int] = ms_flash_hold
-        self.ms_chase_time: Optional[int] = ms_chase_time
-        self.ms_fadein: Optional[int] = ms_fadein
-        self.ms_fadeout: Optional[int] = ms_fadeout
-        self.ms_crossfade: Optional[int] = ms_crossfade
-        self.ms_stop_time: Optional[int] = ms_stop_time
         self.autoreset: Optional[bool] = autoreset
-        self.chase: Optional[bool] = chase
-        self.bpm_chase: Optional[bool] = bpm_chase
-        self.pcrossfade: Optional[bool] = pcrossfade
         self.at_end_pause: Optional[bool] = at_end_pause
-        self.at_end_stop: Optional[bool] = at_end_stop
-        self.flash_mode: Optional[bool] = flash_mode
-        self.no_first_fade: Optional[bool] = no_first_fade
-        self.block_fx: Optional[bool] = block_fx
         self.loops: Optional[int] = loops
+        self.chase: Optional[bool] = chase
+        self.ms_chase_time: Optional[int] = ms_chase_time
         self.visual_id: Optional[int] = visual_id
+        self.bpm_chase: Optional[int] = bpm_chase
+        self.ms_flash_decay: Optional[int] = ms_flash_decay
+        self.pcrossfade: Optional[int] = pcrossfade
+        self.ms_fadeout: Optional[int] = ms_fadeout
         self.direction: Optional[int] = direction
+        self.at_end_stop: Optional[bool] = at_end_stop
+        self.flash_mode: Optional[int] = flash_mode
         self.cuelist_id: Optional[int] = cuelist_id
+        self.ms_fadein: Optional[int] = ms_fadein
+        self.ms_crossfade: Optional[int] = ms_crossfade
+        self.no_first_fade: Optional[bool] = no_first_fade
         self.name: Optional[str] = name
-        self.cuelist_elements: List[CuelistElement] = [
-            CuelistElement(**element) if isinstance(element, dict) else element for element in (cuelist_elements or [])
-        ]
+        self.block_fx: Optional[bool] = block_fx
+        self.cuelist_elements: List[CuelistElement] = cuelist_elements
+        self.ms_flash_hold: Optional[int] = ms_flash_hold
+        self.ms_stop_time: Optional[int] = ms_stop_time
 
     def to_dict(self) -> dict:
         return {
@@ -1138,69 +1472,106 @@ class Cuelist:
             "ms_stop_time": self.ms_stop_time,
         }
 
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialisation of Cuelist object {self.name}")
+        bytestr = bytearray(serialise_section_header("cuelist"))
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = [
+            "ms_flash_attack", "ms_flash_decay", "ms_flash_hold", "ms_chase_time", "ms_fadein", "ms_fadeout", "ms_crossfade", "ms_stop_time", "visual_id", "bpm_chase", "pcrossfade", "direction", "flash_mode", "cuelist_id", "loops"
+        ]
+        bool_attrs = ["autoreset", "chase", "at_end_pause", "at_end_stop", "no_first_fade", "block_fx"]
+        string_attrs = ["name"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in bool_attrs:
+                    content.extend(serialise_bool_value(attr_value))
+                elif attr_name in string_attrs:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name == "cuelist_elements":
+                    num_elements = len(attr_value) if attr_value else 0
+                    content.extend(serialise_objlist_len(num_elements))
+                    if attr_value:  # Only process if there are elements
+                        for element in attr_value:
+                            content.extend(element.to_bytes())
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("Cuelist object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
+
 
 class Playback:
     def __init__(
         self,
-        fader_value=None,
-        on_load_play=None,
-        fader_mode=None,
-        chase=None,
-        index=None,
-        ms_chase_time=None,
-        fader_up_play=None,
-        priority=None,
-        bpm_chase=None,
-        on_page_stop=None,
-        trigger_level=None,
-        is_executor=None,
-        pcrossfade=None,
-        ms_fadeout=None,
-        fader_down_stop=None,
-        ignore_swap=None,
-        swap_always=None,
-        ms_fadein=None,
-        ms_crossfade=None,
-        on_page_play=None,
-        xct_color=None,
-        cuelist=None,
-        xct_push_mode=None,
-        docked=None,
-        xct_cuelist=None,
-        page=None,
-        ignore_grand_master=None,
-        used_in_alarm=None,
-        xct_swap=None,
-    ):
-        self.fader_value = fader_value
-        self.on_load_play = on_load_play
-        self.fader_mode = fader_mode
-        self.chase = chase
-        self.index = index
-        self.ms_chase_time = ms_chase_time
-        self.fader_up_play = fader_up_play
-        self.priority = priority
-        self.bpm_chase = bpm_chase
-        self.on_page_stop = on_page_stop
-        self.trigger_level = trigger_level
-        self.is_executor = is_executor
-        self.pcrossfade = pcrossfade
-        self.ms_fadeout = ms_fadeout
-        self.fader_down_stop = fader_down_stop
-        self.ignore_swap = ignore_swap,
-        self.swap_always = swap_always,
-        self.ms_fadein = ms_fadein
-        self.ms_crossfade = ms_crossfade
-        self.on_page_play = on_page_play
-        self.xct_color = xct_color
-        self.cuelist = cuelist
-        self.xct_push_mode = xct_push_mode
-        self.docked = docked
-        self.xct_cuelist = xct_cuelist
-        self.page = page
-        self.ignore_grand_master = ignore_grand_master
-        self.used_in_alarm = used_in_alarm
-        self.xct_swap = xct_swap
+        fader_value: Optional[int] = None,
+        on_load_play: Optional[bool] = None,
+        fader_mode: Optional[int] = None,
+        chase: Optional[bool] = None,
+        index: Optional[int] = None,
+        ms_chase_time: Optional[int] = None,
+        fader_up_play: Optional[bool] = None,
+        priority: Optional[int] = None,
+        bpm_chase: Optional[int] = None,
+        on_page_stop: Optional[bool] = None,
+        trigger_level: Optional[int] = None,
+        is_executor: Optional[bool] = None,
+        pcrossfade: Optional[int] = None,
+        ms_fadeout: Optional[int] = None,
+        fader_down_stop: Optional[bool] = None,
+        ignore_swap: Optional[bool] = None,
+        swap_always: Optional[bool] = None,
+        ms_fadein: Optional[int] = None,
+        ms_crossfade: Optional[int] = None,
+        on_page_play: Optional[bool] = None,
+        xct_color: Optional[List[int]] = None,
+        cuelist: Optional[int] = None,
+        xct_push_mode: Optional[List[bool]] = None,
+        docked: Optional[bool] = None,
+        used_in_alarm: Optional[bool] = None,
+        xct_cuelist: Optional[List[int]] = None,
+        page: Optional[int] = None,
+        ignore_grand_master: Optional[bool] = None,
+        xct_swap: Optional[List[bool]] = None,
+    ) -> None:
+        self.fader_value: Optional[int] = fader_value
+        self.on_load_play: Optional[bool] = on_load_play
+        self.fader_mode: Optional[int] = fader_mode
+        self.chase: Optional[bool] = chase
+        self.index: Optional[int] = index
+        self.ms_chase_time: Optional[int] = ms_chase_time
+        self.fader_up_play: Optional[bool] = fader_up_play
+        self.priority: Optional[int] = priority
+        self.bpm_chase: Optional[int] = bpm_chase
+        self.on_page_stop: Optional[bool] = on_page_stop
+        self.trigger_level: Optional[int] = trigger_level
+        self.is_executor: Optional[bool] = is_executor
+        self.pcrossfade: Optional[int] = pcrossfade
+        self.ms_fadeout: Optional[int] = ms_fadeout
+        self.fader_down_stop: Optional[bool] = fader_down_stop
+        self.ignore_swap: Optional[bool] = ignore_swap
+        self.swap_always: Optional[bool] = swap_always
+        self.ms_fadein: Optional[int] = ms_fadein
+        self.ms_crossfade: Optional[int] = ms_crossfade
+        self.on_page_play: Optional[bool] = on_page_play
+        self.xct_color: Optional[List[int]] = xct_color
+        self.cuelist: Optional[int] = cuelist
+        self.xct_push_mode: Optional[List[bool]] = xct_push_mode
+        self.docked: Optional[bool] = docked
+        self.used_in_alarm: Optional[bool] = used_in_alarm
+        self.xct_cuelist: Optional[List[int]] = xct_cuelist
+        self.page: Optional[int] = page
+        self.ignore_grand_master: Optional[bool] = ignore_grand_master
+        self.xct_swap: Optional[List[bool]] = xct_swap
 
     @property
     def combined_id(self):
@@ -1241,62 +1612,145 @@ class Playback:
             "xct_swap": self.xct_swap,
         }
 
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialisation of Playback object {self.combined_id}")
+        bytestr = bytearray(serialise_section_header("playback"))
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = [
+            "fader_value", "ms_chase_time", "priority", "bpm_chase", "trigger_level", "pcrossfade", "ms_fadeout", "ms_fadein", "ms_crossfade", "cuelist", "page"
+        ]
+        bool_attrs = ["on_load_play", "chase", "fader_up_play", "on_page_stop", "is_executor", "fader_down_stop", "ignore_swap", "swap_always", "on_page_play", "docked", "used_in_alarm", "ignore_grand_master"]
+        list_attrs = ["xct_color", "xct_push_mode", "xct_cuelist", "xct_swap"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in bool_attrs:
+                    content.extend(serialise_bool_value(attr_value))
+                elif attr_name in list_attrs:
+                    content.extend(serialise_list_value(attr_value))
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("Playback object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 class General:
     class Config:
         def __init__(
             self,
-            update_mode=None,
-            executors_exclusive_mode=None,
-            remove_non_empty_cuelist=None,
-            clear_ltp=None,
-            bpm_mode=None,
-            show_password=None,
-            show_password_enabled=None,
-        ):
-            self.update_mode = update_mode
-            self.executors_exclusive_mode = executors_exclusive_mode
-            self.remove_non_empty_cuelist = remove_non_empty_cuelist
-            self.clear_ltp = clear_ltp
-            self.bpm_mode = bpm_mode
-            self.show_password = show_password
-            self.show_password_enabled = show_password_enabled
+            update_mode: Optional[int] = None,
+            executors_exclusive_mode: Optional[bool] = None,
+            remove_non_empty_cuelist: Optional[bool] = None,
+            clear_ltp: Optional[bool] = None,
+            bpm_mode: Optional[bool] = None,
+            show_password: Optional[str] = None,
+            show_password_enabled: Optional[bool] = None,
+        ) -> None:
+            self.update_mode: Optional[int] = update_mode
+            self.executors_exclusive_mode: Optional[bool] = executors_exclusive_mode
+            self.remove_non_empty_cuelist: Optional[bool] = remove_non_empty_cuelist
+            self.clear_ltp: Optional[bool] = clear_ltp
+            self.bpm_mode: Optional[bool] = bpm_mode
+            self.show_password: Optional[str] = show_password
+            self.show_password_enabled: Optional[bool] = show_password_enabled
 
-    def __init__(self, config=None):
-        self.config = config if config is not None else self.Config()
+        def to_dict(self) -> dict:
+            return {
+                "update_mode": self.update_mode,
+                "executors_exclusive_mode": self.executors_exclusive_mode,
+                "remove_non_empty_cuelist": self.remove_non_empty_cuelist,
+                "clear_ltp": self.clear_ltp,
+                "bpm_mode": self.bpm_mode,
+                "show_password": self.show_password,
+                "show_password_enabled": self.show_password_enabled
+            }
+
+        def to_bytes(self) -> bytes:
+            logging.debug("Starting serialisation of General.Config object")
+            bytestr = bytearray(serialise_section_header("config"))
+            content = bytearray()
+            num_attr = 0
+            
+            num_attrs = ["update_mode"]
+            bool_attrs = [
+                "executors_exclusive_mode",
+                "remove_non_empty_cuelist",
+                "clear_ltp",
+                "bpm_mode",
+                "show_password_enabled"
+            ]
+            string_attrs = ["show_password"]
+
+            for attr_name, attr_value in self.__dict__.items():
+                if attr_value is not None:
+                    content.extend(serialise_attr_name(attr_name))
+                    num_attr += 1
+
+                    if attr_name in num_attrs:
+                        content.extend(serialise_num_value(attr_value, cc_check=True))
+                    elif attr_name in bool_attrs:
+                        content.extend(serialise_bool_value(attr_value))
+                    elif attr_name in string_attrs:
+                        content.extend(serialise_str_value(attr_value))
+
+            content[0:0] = serialise_num_attr(num_attr)
+            bytestr.extend(serialise_content_length(content))
+            bytestr.extend(content)
+            logging.info("General.Config object serialised")
+            logging.debug(bytestr)
+            return bytes(bytestr)
+
+    def __init__(self, config: Optional[Config] = None) -> None:
+        self.config: Optional[General.Config] = config
+
+    def to_dict(self) -> dict:
+        return {
+            "config": self.config.to_dict() if self.config else None
+        }
+
+    def to_bytes(self) -> bytes:
+        logging.debug("Starting serialisation of General object")
+        bytestr = bytearray(serialise_section_header("#general#"))
+        content = bytearray()
+        
+        if self.config is not None:
+            content.extend(self.config.to_bytes())
+
+        bytestr.extend(content)
+        logging.info("General object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
 
 
 class FXPalette:
     def __init__(
         self,
-        fx_palette: int = None,
-        cue_id: int = None,
-        visual_id: int = None,
-        fxs: List["FX"] = None,
-        fxs_channels: List[dict] = None,
-        orders: List[Order] = None,
-        name: str = None,
+        fx_palette: Optional[int] = None,
+        cue_id: Optional[int] = None,
+        visual_id: Optional[int] = None,
+        fxs: Optional[List["FX"]] = None,
+        fxs_channels: Optional[List[Dict[str, Any]]] = None,
+        orders: Optional[List[Order]] = None,
+        name: Optional[str] = None,
     ) -> None:
-        self.fx_palette: int = fx_palette
-        self.cue_id: int = cue_id
-        self.visual_id: int = visual_id
-        self.fxs: List["FX"] = fxs if fxs is not None else []
-        self.fxs_channels: List[dict] = fxs_channels if fxs_channels is not None else []
-        self.orders: List[Order] = orders if orders is not None else []
-        self.name: str = name
+        self.fx_palette: Optional[int] = fx_palette
+        self.cue_id: Optional[int] = cue_id
+        self.visual_id: Optional[int] = visual_id
+        self.fxs: List["FX"] = fxs
+        self.fxs_channels: List[Dict[str, Any]] = fxs_channels 
+        self.orders: List[Order] = orders
+        self.name: Optional[str] = name
 
     def to_dict(self) -> dict:
-        def convert_bytes(obj):
-            if isinstance(obj, bytes):
-                # Convert bytes to a string of Unicode escape sequences (e.g., b'\x02\x04' -> '\\u0002\\u0004')
-                return "".join(f"\\u{byte:04x}" for byte in obj)
-            elif isinstance(obj, dict):
-                return {str(k): convert_bytes(v) for k, v in obj.items()}
-            elif isinstance(obj, (list, tuple)):
-                return [convert_bytes(item) for item in obj]
-            return obj
-
-        converted_fxs_channels = convert_bytes(self.fxs_channels)
         fxs_list = []
         for fx in self.fxs:
             if hasattr(fx, "to_dict"):
@@ -1305,6 +1759,7 @@ class FXPalette:
                 fxs_list.append(fx.__dict__)
             else:
                 fxs_list.append(fx)
+
         orders_list = []
         for order in self.orders:
             if hasattr(order, "to_dict"):
@@ -1317,9 +1772,63 @@ class FXPalette:
         return {
             "fx_palette": self.fx_palette,
             "cue_id": self.cue_id,
+            "description": self.description,
             "visual_id": self.visual_id,
+            "actions": self.actions,
             "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
-            "fxs_channels": converted_fxs_channels,
+            "fxs_channels": self.fxs_channels,
             "orders": orders_list,
             "name": self.name,
         }
+        
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of FXPalette object {self.name} (id: {self.fx_palette})")
+        bytestr = bytearray(serialise_section_header("fxpalette"))
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = ["fx_palette", "cue_id", "visual_id"]
+        string_attrs = ["name"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+                
+                if attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in string_attrs:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name == 'fxs_channels':
+                    num_lists = len(attr_value)
+                    content.extend(serialise_objlist_len(num_lists))
+                    for fx_channel in attr_value:
+                        list_content = bytearray()
+                        list_len = sum(1 for value in fx_channel if not isinstance(value, str))
+                        if list_len != 16:
+                            raise ValueError("FX channel list length should be 16 (NOTE: unconfirmed. though this error shouldn't happen either way...)")
+                        list_content.extend(serialise_objlist_len(list_len))
+                        for value in fx_channel:
+                            # \xd1 \x?? instances
+                            if isinstance(value, str):
+                                list_content.extend(bytes.fromhex(value))
+                            else:
+                                list_content.extend(serialise_num_value(value, cc_check=True))
+                        content.extend(list_content)
+                elif attr_name == 'fxs':
+                    num_fxs = len(attr_value)
+                    content.extend(serialise_objlist_len(num_fxs))
+                    for fx in attr_value:
+                        content.extend(fx.to_bytes())
+                elif attr_name == 'orders':
+                    num_orders = len(attr_value)
+                    content.extend(serialise_objlist_len(num_orders))
+                    for order in attr_value:
+                        content.extend(order.to_bytes())
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("FXPalette object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)

@@ -12,7 +12,7 @@ def serialise_lightshow(lightshow: Lightshow) -> bytes:
 def serialise_fileinfo(fileinfo: FileInfo) -> bytes:
 
     file_bytes = bytearray()
-    file_bytes.extend(section_header("#fileinfo#"))
+    file_bytes.extend(serialise_section_header("#fileinfo#"))
     
 
     ## Version ##

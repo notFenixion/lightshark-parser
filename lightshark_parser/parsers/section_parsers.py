@@ -470,6 +470,8 @@ def read_order(file_bytes: bytes, ptr: int) -> tuple[Order, int]:
 
         if attr_name in ["palette_id", "universe", "section", "receptor_type", "patch_id", "channel", "ftype"]:
             ptr = _read_number_attribute(file_bytes, ptr, order, attr_name)
+        # seperated this originally before _read_number_attribute was updated to handle multibyte values
+        # keeping it here because of the channel marker check
         elif attr_name in ["value"]:
             ptr = _read_number_attribute(file_bytes, ptr, order, attr_name, b"\xa7channel")
         else:
@@ -578,12 +580,10 @@ def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[FX.FXLayer, int]:
     while file_bytes[ptr] != 0x88 and num_attr < num_attr_indicated:
         attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "layer", layer)
 
-        if attr_name in ["section", "id"]:
+        if attr_name in ["section", "id", "phase_offset", "curve", "size"]:
             ptr = _read_number_attribute(file_bytes, ptr, layer, attr_name)
         elif attr_name in ["blind"]:
             ptr = _read_boolean_attribute(file_bytes, ptr, layer, attr_name)
-        elif attr_name in ["phase_offset", "curve", "size"]:
-            ptr = _read_number_attribute(file_bytes, ptr, layer, attr_name)
         elif attr_name == "ftypes":
             ptr = _read_list_attribute(file_bytes, ptr, layer, attr_name)
         # Complex attributes
@@ -692,7 +692,11 @@ def read_cue(file_bytes: bytes, ptr: int) -> tuple[Cue, int]:
         attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "cue", cue)
 
         if attr_name in ["fx_palette"]:
-            ptr = _read_number_attribute(file_bytes, ptr, cue, attr_name)
+            if file_bytes[ptr] == 0xFF:
+                cue[attr_name] = None
+                ptr += 1
+            else:
+                ptr = _read_number_attribute(file_bytes, ptr, cue, attr_name)
         elif attr_name in ["cue_id", "visual_id"]:
             ptr = _read_number_attribute(file_bytes, ptr, cue, attr_name)
         elif attr_name in ["description", "name"]:
@@ -727,7 +731,7 @@ def read_cue(file_bytes: bytes, ptr: int) -> tuple[Cue, int]:
                 while i < channel_len:
                     # probably deleted? idk
                     if file_bytes[ptr] == 0xD1:
-                        channel.append(file_bytes[ptr : ptr + 2])
+                        channel.append(file_bytes[ptr : ptr + 2].hex())
                         ptr += 2
                     else:
                         temp = {}
