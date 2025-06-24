@@ -27,7 +27,6 @@ def print_dash_line():
     except:
         logging.info("-" * 80)
 
-
 def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     if not filepath.lower().endswith(".lshw"):
         print("Error: File must have be of extension .lshw", file=sys.stderr)
@@ -45,21 +44,38 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         print(f"Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
 
-    fileinfo = {}
-    models = {}
-    patching = {}
-    groups = {}
-    user_palettes = {}
-    cues = {}
-    cuelists = {}
-    playbacks = {}
-    general = {}
-    fxpalettes = {}
+    fileinfo = None
+    models = None
+    patching = None
+    groups = None
+    user_palettes = None
+    cues = None
+    cuelists = None
+    playbacks = None
+    general = None
+    fxpalettes = None
     # other sections. i dont fully understand these yet so not parsing them for now
-    schedules = {}
-    osc_targets = {}
+    schedules = None
+    osc_targets = None
 
     ptr = 0
+
+    # num_checked = 0
+    # section_headers = [
+    #     b"\x00\x00\x00\x0b\xaa#fileinfo#",
+    #     b"\x00\x00\x00\x09\xa8#models#",
+    #     b"\x00\x00\x00\x0b\xaa#patching#",
+    #     b"\x00\x00\x00\x10\xaf#user_palettes#",
+    #     b"\x00\x00\x00\x07\xa6#cues#",
+    #     b"\x00\x00\x00\x0b\xaa#cuelists#",
+    #     b"\x00\x00\x00\x0c\xab#playbacks#",
+    #     b"\x00\x00\x00\x0a\xa9#general#",
+    #     b"\x00\x00\x00\x0d\xac#fxpalettes#"
+    # ]
+
+
+
+
 
     ## FILEINFO ##
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#fileinfo#":
@@ -76,6 +92,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     logging.info("Finished reading fileinfo. Moving onto models...")
     if file_bytes[ptr : ptr + 13] != b"\x00\x00\x00\x09\xa8#models#":
         raise MarkerNotFoundError("Could not find #models# in file")
+    models = {}
     ptr += 13
     while file_bytes[ptr : ptr + 10] == b"\x00\x00\x00\x06\xa5model":
         ptr += 10
@@ -92,6 +109,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     logging.info("Finished reading models. Moving onto patches...")
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#patching#":
         raise MarkerNotFoundError("Could not find #patching# in file")
+    patching = {}
     ptr += 15
     while file_bytes[ptr : ptr + 10] == b"\x00\x00\x00\x06\xa5patch":
         ptr += 10
@@ -108,6 +126,9 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
 
     ## GROUPS ##
     logging.info("Finished reading patches. Moving onto groups...")
+    # initial check for if there are groups at all
+    if file_bytes[ptr : ptr + 10] == b"\x00\x00\x00\x06\xa5group":
+        groups = {}
     while file_bytes[ptr : ptr + 10] == b"\x00\x00\x00\x06\xa5group":
         ptr += 10
         group, ptr = read_group(file_bytes, ptr)
@@ -124,6 +145,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     # logging.debug(file_bytes[ptr:ptr+20])
     if file_bytes[ptr : ptr + 20] != b"\x00\x00\x00\x10\xaf#user_palettes#":
         raise MarkerNotFoundError("Could not find #user_palettes# in file")
+    user_palettes = {}
     ptr += 20
     deleted_flag = False
     while file_bytes[ptr : ptr + 17] == b"\x00\x00\x00\x0d\xacuser_palette" or (
@@ -154,6 +176,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     logging.info("Finished reading user palettes. Moving onto cues...")
     if file_bytes[ptr : ptr + 11] != b"\x00\x00\x00\x07\xa6#cues#":
         raise MarkerNotFoundError("Could not find #cues# in file")
+    cues = {}
     ptr += 11
     while file_bytes[ptr : ptr + 8] == b"\x00\x00\x00\x04\xa3cue":
         ptr += 8
@@ -170,6 +193,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     logging.info("Finished reading cues. Moving onto cuelists...")
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#cuelists#":
         raise MarkerNotFoundError("Could not find #cuelists# in file")
+    cuelists = {}
     ptr += 15
     while file_bytes[ptr : ptr + 12] == b"\x00\x00\x00\x08\xa7cuelist":
         ptr += 12
@@ -188,6 +212,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     logging.info("Finished reading cuelists. Moving onto playbacks...")
     if file_bytes[ptr : ptr + 16] != b"\x00\x00\x00\x0c\xab#playbacks#":
         raise MarkerNotFoundError("Could not find #playbacks# in file")
+    playbacks = {}
     ptr += 16
     while file_bytes[ptr : ptr + 13] == b"\x00\x00\x00\x09\xa8playback":
         ptr += 13
@@ -204,7 +229,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
 
     ## GENERAL ##
     logging.info("Finished reading playbacks. Moving onto general...")
-    if file_bytes[ptr : ptr + 14] != b"\x00\x00\x00\n\xa9#general#":
+    if file_bytes[ptr : ptr + 14] != b"\x00\x00\x00\x0a\xa9#general#":
         raise MarkerNotFoundError("Could not find #general# in file")
     ptr += 14
     general, ptr = read_general(file_bytes, ptr)
@@ -217,9 +242,10 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
 
     ## FX PALETTES ##
     logging.info("Finished reading general. Moving onto FX palettes...")
-    if file_bytes[ptr : ptr + 17] != b"\x00\x00\x00\r\xac#fxpalettes#":
+    if file_bytes[ptr : ptr + 17] != b"\x00\x00\x00\x0d\xac#fxpalettes#":
         logging.warning("Could not find #fxpalettes# in file.")
     else:
+        fxpalettes = {}
         ptr += 17
         while file_bytes[ptr : ptr + 14] == b"\x00\x00\x00\x0a\xa9fxpalette":
             ptr += 14
@@ -345,7 +371,7 @@ def main():
         default=0,
         help="Increase verbosity (use -v for basic info, -vv for detailed debug)",
     )
-    parser.add_argument("-o", "--output", metavar="output_file", help="Output file path")
+    parser.add_argument("-o", "--output", metavar="output_file", help="Output file path. If not specified, defaults to <input_file>.json or <input_file>_summary.txt")
 
     # If no arguments or action specified, show help
     if len(sys.argv) == 1:

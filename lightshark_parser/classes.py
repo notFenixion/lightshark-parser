@@ -10,7 +10,7 @@ class Lightshow:
     def __init__(
         self,
         filepath: str,
-        fileinfo: Dict[Any, "FileInfo"] = None,
+        fileinfo: "FileInfo" = None,
         models: Dict[Any, "Model"] = None,
         patches: Dict[Any, "Patch"] = None,
         groups: Dict[Any, "Group"] = None,
@@ -19,7 +19,7 @@ class Lightshow:
         cuelists: Dict[Any, "Cuelist"] = None,
         playbacks: Dict[Any, "Playback"] = None,
         fxpalettes: Dict[Any, "FXPalette"] = None,
-        general: Dict[Any, "General"] = None,
+        general: "General" = None,
     ):
         self._filepath = Path(filepath)
         if not self._filepath.exists():
@@ -32,19 +32,18 @@ class Lightshow:
         self._created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
         self._modified_at = modified_at.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Initialize section attributes with private names
-        self._fileinfo: Dict[Any, "FileInfo"] = fileinfo if fileinfo is not None else {}
-        self._models: Dict[Any, "Model"] = models if models is not None else {}
-        self._patches: Dict[Any, "Patch"] = patches if patches is not None else {}
-        self._groups: Dict[Any, "Group"] = groups if groups is not None else {}
-        self._user_palettes: Dict[Any, "UserPalette"] = user_palettes if user_palettes is not None else {}
-        self._cues: Dict[Any, "Cue"] = cues if cues is not None else {}
-        self._cuelists: Dict[Any, "Cuelist"] = cuelists if cuelists is not None else {}
-        self._playbacks: Dict[Any, "Playback"] = playbacks if playbacks is not None else {}
-        self._fxpalettes: Dict[Any, "FXPalette"] = fxpalettes if fxpalettes is not None else {}
-        self._general: Dict[Any, "General"] = general if general is not None else {}
+        self._fileinfo: "FileInfo" = fileinfo
+        self._models: Dict[Any, "Model"] = models
+        self._patches: Dict[Any, "Patch"] = patches
+        self._groups: Dict[Any, "Group"] = groups
+        self._user_palettes: Dict[Any, "UserPalette"] = user_palettes
+        self._cues: Dict[Any, "Cue"] = cues
+        self._cuelists: Dict[Any, "Cuelist"] = cuelists
+        self._playbacks: Dict[Any, "Playback"] = playbacks
+        self._fxpalettes: Dict[Any, "FXPalette"] = fxpalettes
+        self._general: "General" = general
 
-    # Property getters for non-section attributes
+    # Getters and setters
     @property
     def filepath(self) -> Path:
         return self._filepath
@@ -67,17 +66,11 @@ class Lightshow:
 
     # Property getters for section attributes
     @property
-    def fileinfo(self) -> Dict:
+    def fileinfo(self) -> "FileInfo":
         return self._fileinfo
         
     @fileinfo.setter
-    def fileinfo(self, value: Dict) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("fileinfo must be a dictionary")
-        from .classes import FileInfo  # Import here to avoid circular imports
-        for model in value.values():
-            if not isinstance(model, FileInfo):
-                raise TypeError("All model values must be FileInfo objects")
+    def fileinfo(self, value: "FileInfo") -> None:
         self._fileinfo = value
         
     @property
@@ -86,11 +79,8 @@ class Lightshow:
         
     @models.setter
     def models(self, value: Dict[Any, Any]) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("models must be a dictionary")
-        from .classes import Model  # Import here to avoid circular imports
         for model in value.values():
-            if not isinstance(model, Model):
+            if model.__class__.__name__ != 'Model':
                 raise TypeError("All model values must be Model objects")
         self._models = value
         
@@ -100,11 +90,8 @@ class Lightshow:
         
     @patches.setter
     def patches(self, value: Dict[Any, "Patch"]) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("patches must be a dictionary")
-        from .classes import Patch  # Import here to avoid circular imports
         for patch in value.values():
-            if not isinstance(patch, Patch):
+            if patch.__class__.__name__ != 'Patch':
                 raise TypeError("All patch values must be Patch objects")
         self._patches = value
         
@@ -114,11 +101,8 @@ class Lightshow:
         
     @groups.setter
     def groups(self, value: Dict[Any, "Group"]) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("groups must be a dictionary")
-        from .classes import Group  # Import here to avoid circular imports
         for group in value.values():
-            if not isinstance(group, Group):
+            if group.__class__.__name__ != 'Group':
                 raise TypeError("All group values must be Group objects")
         self._groups = value
         
@@ -128,11 +112,8 @@ class Lightshow:
         
     @user_palettes.setter
     def user_palettes(self, value: Dict) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("user_palettes must be a dictionary")
-        # Assuming UserPalette objects have a specific attribute or method
         for palette in value.values():
-            if not hasattr(palette, 'user_palette_id'):
+            if palette.__class__.__name__ != 'UserPalette':
                 raise TypeError("All user_palette values must be UserPalette objects")
         self._user_palettes = value
         
@@ -142,11 +123,8 @@ class Lightshow:
         
     @cues.setter
     def cues(self, value: Dict) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("cues must be a dictionary")
-        # Assuming Cue objects have a specific attribute or method
         for cue in value.values():
-            if not hasattr(cue, 'cue_id'):
+            if cue.__class__.__name__ != 'Cue':
                 raise TypeError("All cue values must be Cue objects")
         self._cues = value
         
@@ -156,12 +134,9 @@ class Lightshow:
         
     @cuelists.setter
     def cuelists(self, value: Dict) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("cuelists must be a dictionary")
-        # Assuming CueList objects have a specific attribute or method
         for cuelist in value.values():
-            if not hasattr(cuelist, 'cuelist_id'):
-                raise TypeError("All cuelist values must be CueList objects")
+            if cuelist.__class__.__name__ != 'Cuelist':
+                raise TypeError("All cuelist values must be Cuelist objects")
         self._cuelists = value
         
     @property
@@ -170,11 +145,8 @@ class Lightshow:
         
     @playbacks.setter
     def playbacks(self, value: Dict) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("playbacks must be a dictionary")
-        # Assuming Playback objects have a specific attribute or method
         for playback in value.values():
-            if not hasattr(playback, 'playback_id'):
+            if playback.__class__.__name__ != 'Playback':
                 raise TypeError("All playback values must be Playback objects")
         self._playbacks = value
         
@@ -184,23 +156,17 @@ class Lightshow:
         
     @fxpalettes.setter
     def fxpalettes(self, value: Dict) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("fxpalettes must be a dictionary")
-        # Assuming FXPalette objects have a specific attribute or method
         for fxpalette in value.values():
-            if not hasattr(fxpalette, 'fx_palette_id'):
+            if fxpalette.__class__.__name__ != 'FXPalette':
                 raise TypeError("All fxpalette values must be FXPalette objects")
         self._fxpalettes = value
         
     @property
-    def general(self) -> Dict:
+    def general(self) -> "General":
         return self._general
         
     @general.setter
-    def general(self, value: Dict) -> None:
-        if not isinstance(value, dict):
-            raise TypeError("general must be a dictionary")
-        # General section might contain mixed types, so we just validate it's a dict
+    def general(self, value: "General") -> None:
         self._general = value
 
     def to_dict(self) -> Dict:
@@ -217,14 +183,14 @@ class Lightshow:
 
         return {
             "fileinfo": to_dict_recursive(self._fileinfo),
-            "models": [to_dict_recursive(model) for model in self._models.values()],
-            "patches": [to_dict_recursive(patch) for patch in self._patches.values()],
-            "groups": [to_dict_recursive(group) for group in self._groups.values()],
-            "user_palettes": {str(k): to_dict_recursive(v) for k, v in self._user_palettes.items()},
-            "cues": {str(k): to_dict_recursive(v) for k, v in self._cues.items()},
-            "cuelists": {str(k): to_dict_recursive(v) for k, v in self._cuelists.items()},
-            "playbacks": {str(k): to_dict_recursive(v) for k, v in self._playbacks.items()},
-            "fxpalettes": {str(k): to_dict_recursive(v) for k, v in self._fxpalettes.items()},
+            "models": {str(k): to_dict_recursive(v) for k, v in self._models.items()} if self._models else {},
+            "patches": {str(k): to_dict_recursive(v) for k, v in self._patches.items()} if self._patches else {},
+            "groups": {str(k): to_dict_recursive(v) for k, v in self._groups.items()} if self._groups else {},
+            "user_palettes": {str(k): to_dict_recursive(v) for k, v in self._user_palettes.items()} if self._user_palettes else {},
+            "cues": {str(k): to_dict_recursive(v) for k, v in self._cues.items()} if self._cues else {},
+            "cuelists": {str(k): to_dict_recursive(v) for k, v in self._cuelists.items()} if self._cuelists else {},
+            "playbacks": {str(k): to_dict_recursive(v) for k, v in self._playbacks.items()} if self._playbacks else {},
+            "fxpalettes": {str(k): to_dict_recursive(v) for k, v in self._fxpalettes.items()} if self._fxpalettes else {},
             "general": to_dict_recursive(self._general),
         }
 
@@ -266,18 +232,21 @@ class Lightshow:
             for cuelist in self._cuelists.values():
                 bytestr.extend(cuelist.to_bytes())
         
-        bytestr.extend(serialise_section_header("#playbacks"))
+        bytestr.extend(serialise_section_header("#playbacks#"))
         if self._playbacks is not None:
             for playback in self._playbacks.values():
                 bytestr.extend(playback.to_bytes())
+
+        if self._general is not None:
+            bytestr.extend(self._general.to_bytes())
 
         bytestr.extend(serialise_section_header("#fxpalettes#"))
         if self._fxpalettes is not None:
             for fxpalette in self._fxpalettes.values():
                 bytestr.extend(fxpalette.to_bytes())
-        if self._general is not None:
-            bytestr.extend(self._general.to_bytes())
         
+        bytestr.extend(serialise_section_header("#end#"))
+
         return bytestr
 
 
@@ -388,11 +357,11 @@ class ModelPalette:
 
 @dataclass
 class ModelHardware:
-    width: Optional[int] = None
-    depth: Optional[int] = None
-    max_power: Optional[int] = None
-    weight: Optional[int] = None
-    height: Optional[int] = None
+    width: Optional[str] = None
+    depth: Optional[str] = None
+    max_power: Optional[str] = None
+    weight: Optional[str] = None
+    height: Optional[str] = None
 
 
     def to_bytes(self) -> bytes:
@@ -400,15 +369,15 @@ class ModelHardware:
         bytestr = bytearray()
         num_attr = 0
         
-        num_attrs = ["width", "depth", "max_power", "weight", "height"]
+        string_attrs = ["width", "depth", "max_power", "weight", "height"]
         
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
                 bytestr.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 
-                if attr_name in num_attrs:
-                    bytestr.extend(serialise_num_value(attr_value))
+                if attr_name in string_attrs:
+                    bytestr.extend(serialise_str_value(attr_value))
 
         bytestr[0:0] = serialise_num_attr(num_attr)
         
@@ -442,8 +411,9 @@ class MacroStep:
                     for value in attr_value:
                         if len(value) != 2:
                             raise ValueError("Value list must contain exactly 2 elements")
+                        bytestr.extend(b'\x92')
                         bytestr.extend(serialise_str_value(value["name"]))
-                        bytestr.extend(serialise_num_value(value["value"]), cc_check=True)
+                        bytestr.extend(serialise_num_value(value["value"], cc_check=True))
 
         bytestr[0:0] = serialise_num_attr(num_attr)
         
@@ -463,7 +433,7 @@ class Macro:
         bytestr = bytearray()
         num_attr = 0
         
-        string_attrs = ["name", "macro_type"]
+        string_attrs = ["name"]
         
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None and attr_name != "macro_type":  # macro_type is handled separately
@@ -478,13 +448,8 @@ class Macro:
                     for step in attr_value:
                         bytestr.extend(step.to_bytes())
         
-        # Handle macro_type separately as it's a special case
-        if self.macro_type is not None:
-            bytestr.extend(serialise_attr_name("macro_type"))
-            bytestr.extend(serialise_str_value(self.macro_type))
-            num_attr += 1
 
-        bytestr[0:0] = serialise_str_name("macro_type") + serialise_num_attr(num_attr)
+        bytestr[0:0] = serialise_str_value(self.macro_type) + serialise_num_attr(num_attr)
         
         logging.info("Macro object serialised")
         logging.debug(bytestr)
@@ -499,6 +464,7 @@ class ModelValueStep:
     min_str: Optional[str] = None
     max_str: Optional[str] = None
     symbol: Optional[str] = None
+
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of ModelValueStep")
@@ -560,7 +526,7 @@ class ModelValue:
                     num_steps = len(attr_value)
                     bytestr.extend(serialise_num_attr(num_steps))
                     for id, step in attr_value.items():
-                        bytestr.extend(serialise_num_value(id))
+                        bytestr.extend(serialise_num_value(id, cc_check=True))
                         bytestr.extend(step.to_bytes())
 
         bytestr[0:0] = serialise_num_attr(num_attr)
@@ -635,7 +601,7 @@ class Model:
                 elif attr_name == "macros":
                     num_macros = len(attr_value)
                     content.extend(serialise_num_attr(num_macros))
-                    for macro in attr_value:
+                    for macro in attr_value.values():
                         content.extend(macro.to_bytes())
                 elif attr_name == "values":
                     num_values = len(attr_value)
@@ -1114,7 +1080,7 @@ class FX:
             bytestr = bytearray()
             num_attr = 0
             
-            num_attrs = ["id", "phase_offset", "section", "curve"]
+            num_attrs = ["id", "phase_offset", "section", "curve", "size"]
             bool_attrs = ["blind"]
             num_list_attrs = ["ftypes"]
             
@@ -1374,7 +1340,7 @@ class Cuelist:
             num_attr = 0
             
             num_attrs = [
-                "ms_fadeout", "cue_id", "ms_delay", "next", "ms_fadein", "ms_crossfade",
+                "ms_fadeout", "cue_id", "ms_delay", "next", "dotted_id", "ms_fadein", "ms_crossfade",
                 "ms_duration"
             ]
             bool_attrs = ["halt"]
@@ -1479,7 +1445,8 @@ class Cuelist:
         num_attr = 0
         
         num_attrs = [
-            "ms_flash_attack", "ms_flash_decay", "ms_flash_hold", "ms_chase_time", "ms_fadein", "ms_fadeout", "ms_crossfade", "ms_stop_time", "visual_id", "bpm_chase", "pcrossfade", "direction", "flash_mode", "cuelist_id", "loops"
+            "ms_flash_attack", "ms_flash_decay", "ms_flash_hold", "ms_chase_time", "ms_fadein", "ms_fadeout",
+            "ms_crossfade", "ms_stop_time", "visual_id", "bpm_chase", "pcrossfade", "direction", "flash_mode", "cuelist_id", "loops"
         ]
         bool_attrs = ["autoreset", "chase", "at_end_pause", "at_end_stop", "no_first_fade", "block_fx"]
         string_attrs = ["name"]
@@ -1619,10 +1586,15 @@ class Playback:
         num_attr = 0
         
         num_attrs = [
-            "fader_value", "ms_chase_time", "priority", "bpm_chase", "trigger_level", "pcrossfade", "ms_fadeout", "ms_fadein", "ms_crossfade", "cuelist", "page"
+            "fader_value", "fader_mode", "index", "ms_chase_time", "priority", "bpm_chase", "trigger_level", "pcrossfade", "ms_fadeout", "ms_fadein",
+            "ms_crossfade", "cuelist", "page"
         ]
-        bool_attrs = ["on_load_play", "chase", "fader_up_play", "on_page_stop", "is_executor", "fader_down_stop", "ignore_swap", "swap_always", "on_page_play", "docked", "used_in_alarm", "ignore_grand_master"]
-        list_attrs = ["xct_color", "xct_push_mode", "xct_cuelist", "xct_swap"]
+        bool_attrs = [
+            "on_load_play", "chase", "fader_up_play", "on_page_stop", "is_executor", "fader_down_stop", "ignore_swap",
+            "swap_always", "on_page_play", "docked", "used_in_alarm", "ignore_grand_master"
+        ]
+        num_list_attrs = ["xct_color", "xct_cuelist"]
+        bool_list_attrs = ["xct_push_mode", "xct_swap"]
         
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
@@ -1633,8 +1605,10 @@ class Playback:
                     content.extend(serialise_num_value(attr_value, cc_check=True))
                 elif attr_name in bool_attrs:
                     content.extend(serialise_bool_value(attr_value))
-                elif attr_name in list_attrs:
-                    content.extend(serialise_list_value(attr_value))
+                elif attr_name in num_list_attrs:
+                    content.extend(serialise_num_list(attr_value))
+                elif attr_name in bool_list_attrs:
+                    content.extend(serialise_bool_list(attr_value))
 
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
@@ -1681,13 +1655,7 @@ class General:
             num_attr = 0
             
             num_attrs = ["update_mode"]
-            bool_attrs = [
-                "executors_exclusive_mode",
-                "remove_non_empty_cuelist",
-                "clear_ltp",
-                "bpm_mode",
-                "show_password_enabled"
-            ]
+            bool_attrs = ["executors_exclusive_mode", "remove_non_empty_cuelist", "clear_ltp", "bpm_mode", "show_password_enabled"]
             string_attrs = ["show_password"]
 
             for attr_name, attr_value in self.__dict__.items():
@@ -1736,18 +1704,22 @@ class FXPalette:
         self,
         fx_palette: Optional[int] = None,
         cue_id: Optional[int] = None,
+        description: Optional[str] = None,
         visual_id: Optional[int] = None,
         fxs: Optional[List["FX"]] = None,
         fxs_channels: Optional[List[Dict[str, Any]]] = None,
         orders: Optional[List[Order]] = None,
+        actions: Optional[List["Action"]] = None,
         name: Optional[str] = None,
     ) -> None:
         self.fx_palette: Optional[int] = fx_palette
         self.cue_id: Optional[int] = cue_id
+        self.description: Optional[str] = description
         self.visual_id: Optional[int] = visual_id
         self.fxs: List["FX"] = fxs
         self.fxs_channels: List[Dict[str, Any]] = fxs_channels 
         self.orders: List[Order] = orders
+        self.actions: List["Action"] = actions
         self.name: Optional[str] = name
 
     def to_dict(self) -> dict:
@@ -1788,7 +1760,7 @@ class FXPalette:
         num_attr = 0
         
         num_attrs = ["fx_palette", "cue_id", "visual_id"]
-        string_attrs = ["name"]
+        string_attrs = ["description", "name"]
         
         for attr_name, attr_value in self.__dict__.items():
             if attr_value is not None:
@@ -1804,9 +1776,10 @@ class FXPalette:
                     content.extend(serialise_objlist_len(num_lists))
                     for fx_channel in attr_value:
                         list_content = bytearray()
+                        logging.debug(fx_channel)
                         list_len = sum(1 for value in fx_channel if not isinstance(value, str))
                         if list_len != 16:
-                            raise ValueError("FX channel list length should be 16 (NOTE: unconfirmed. though this error shouldn't happen either way...)")
+                            raise ValueError(f"FX channel list length should be 16, {list_len} detected (NOTE: unconfirmed. though this error shouldn't happen either way...)")
                         list_content.extend(serialise_objlist_len(list_len))
                         for value in fx_channel:
                             # \xd1 \x?? instances

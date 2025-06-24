@@ -2,6 +2,9 @@
 # Custom
 Lightshows/
 *.json
+*.lshw
+*.txt
+
 tests/analyze_show.py
 
 

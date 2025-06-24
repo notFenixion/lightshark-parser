@@ -1,4 +1,4 @@
-
+import math
 
 def serialise_section_header(section_name: str) -> bytes:
     return (
@@ -22,20 +22,20 @@ def serialise_num_value(num_value: int, cc_check: bool = False) -> bytes:
     if num_value <= threshold:
         return num_value.to_bytes(1, "big")
     else:
-       
-        num_bytes = (num_value.bit_length() + 7) // 8
-        return (num_bytes + 0xCB).to_bytes(1, "big") + num_value.to_bytes(num_bytes, "big")
+        num_bytes = 1 << (math.ceil(num_value.bit_length() / 8) - 1).bit_length()
+        return (0xCC + int(math.log(num_bytes,2))).to_bytes(1, "big") + num_value.to_bytes(num_bytes, "big")
 
 def serialise_bool_value(bool_value: bool) -> bytes:
     return (0xC3 if bool_value else 0xC2).to_bytes(1, "big")
 
 def serialise_str_value(str_value: str) -> bytes:
-    str_len = len(str_value)
-    if str_len < 32:  # 0xA0 + len < 0xC0
-        return (str_len + 0xA0).to_bytes(1, "big") + str_value.encode("utf-8")
+    encoded = str_value.encode("utf-8")
+    byte_len = len(encoded)
+    if byte_len < 32:  # 0xA0 + len < 0xC0
+        return (byte_len + 0xA0).to_bytes(1, "big") + encoded
     else:
         # For longer strings, use 0xDA followed by 2-byte length
-        return (0xDA).to_bytes(1, "big") + str_len.to_bytes(2, "big") + str_value.encode("utf-8")
+        return (0xDA).to_bytes(1, "big") + byte_len.to_bytes(2, "big") + encoded
 
 
 def serialise_objlist_len(objlist_len: int) -> bytes:

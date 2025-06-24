@@ -100,7 +100,6 @@ def read_model_palette(file_bytes: bytes, ptr: int) -> tuple[ModelPalette, int]:
             values = {}
             num_values, ptr = _read_obj_list_len(file_bytes, ptr)
             for _ in range(num_values):
-                # logging.debug(file_bytes[ptr:ptr+10])
                 if file_bytes[ptr] != 0x92:
                     raise ValueError(f"Marker \\x92 expected but {hex(file_bytes[ptr])} was found instead. (NOTE: there might be other values I'm not aware of. Feel free to report!)")
                 ptr += 1
@@ -231,6 +230,7 @@ def read_model_value(file_bytes: bytes, ptr: int) -> tuple[ModelValue, int]:
 def read_model_value_step(file_bytes: bytes, ptr: int) -> tuple[ModelValueStep, int]:
     step = {}
     if file_bytes[ptr] != 0x95:
+        logging.debug(file_bytes[ptr:ptr+10])
         raise ValueError(f"Expected ModelValueStep marker 0x95, got {hex(file_bytes[ptr])} (NOTE: marker is not confirmed to be 0x95 only)")
     ptr += 1
     ptr = _read_string_attribute(file_bytes, ptr, step, "step_name")
@@ -1052,7 +1052,7 @@ def read_fxpalette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
 
                 while i < channel_len:
                     if file_bytes[ptr] == 0xD1:
-                        channel.append(file_bytes[ptr : ptr + 2])
+                        channel.append(file_bytes[ptr : ptr + 2].hex())
                         ptr += 2
                     else:
                         temp = {}
