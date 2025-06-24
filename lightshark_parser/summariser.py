@@ -389,45 +389,45 @@ def format_cues(lightshow: Lightshow) -> str:
                     patch_ids.extend(fx.patches)
                 if patch_ids:
                     output += f"\n            {fx_palette.name} ({fx_palette_id}): {', '.join(map(str, sorted(set(patch_ids))))}"
-        else:
-            if cue.fxs:
-                output += "\n        Non-palette FXs:"
-                for fx in cue.fxs:
-                    output += f"\n            FX {fx.gfxid}:"
-                    output += f"\n                Patches: {', '.join(map(str, sorted(fx.patches)))}"
-                    output += f"\n                Direction: {fx.direction}"
-                    output += f"\n                Speed: {fx.bpm} BPM" if fx.speed_in_bpm and fx.bpm else f"\n                Speed: {fx.speed} ms"
-                    output += f"\n                Width: {fx.width/100:.2f}%"
-                    output += f"\n                Phase/Spread: {fx.spread * 360 / 1024:.1f}°"
-                    output += f"\n                Offset: {fx.phase_offset * 360 / 1024:.1f}°"
-                    output += f"\n                Basic: {fx.basic}"
 
-                    # Add advanced FX here if fx.basic is not True
-                    if not fx.basic:
-                        output += "\n                Layers:"
-                        for layer in fx.layers:
-                            output += f"\n                Layer {layer.id}:"
-                            output += f"\n                    Offset: {layer.phase_offset * 360 / 1024:.1f}°"
-                            output += f"\n                    Size: {layer.size/100:.2f}%"
-                            output += f"\n                    Blind: {layer.blind}"
+        if cue.fxs:
+            output += "\n        Non-palette FXs:"
+            for fx in cue.fxs:
+                output += f"\n            FX {fx.gfxid}:"
+                output += f"\n                Patches: {', '.join(map(str, sorted(fx.patches)))}"
+                output += f"\n                Direction: {fx.direction}"
+                output += f"\n                Speed: {fx.bpm} BPM" if fx.speed_in_bpm and fx.bpm else f"\n                Speed: {fx.speed} ms"
+                output += f"\n                Width: {fx.width/100:.2f}%"
+                output += f"\n                Phase/Spread: {fx.spread * 360 / 1024:.1f}°"
+                output += f"\n                Offset: {fx.phase_offset * 360 / 1024:.1f}°"
+                output += f"\n                Basic: {fx.basic}"
+
+                # Add advanced FX here if fx.basic is not True
+                if not fx.basic:
+                    output += "\n                Layers:"
+                    for layer in fx.layers:
+                        output += f"\n                Layer {layer.id}:"
+                        output += f"\n                    Offset: {layer.phase_offset * 360 / 1024:.1f}°"
+                        output += f"\n                    Size: {layer.size/100:.2f}%"
+                        output += f"\n                    Blind: {layer.blind}"
+                        
+                        # Add steps
+                        for step in layer.steps:
+                            ancho = getattr(step, 'ancho', 0)
+                            start_deg = (getattr(step, 'inicio', 0) / 1024) * 360
+                            width_deg = (ancho / 1024) * 360
+                            end_deg = start_deg + width_deg
                             
-                            # Add steps
-                            for step in layer.steps:
-                                ancho = getattr(step, 'ancho', 0)
-                                start_deg = (getattr(step, 'inicio', 0) / 1024) * 360
-                                width_deg = (ancho / 1024) * 360
-                                end_deg = start_deg + width_deg
-                                
-                                output += f"\n                    {getattr(step, 'name', 'Step')}:"
-                                output += f"\n                        Range: {start_deg:.1f}° to {end_deg:.1f}° (width: {width_deg:.1f}°)"
-                                output += f"\n                        Start Limit: {getattr(step, 'start_limit', 0)/100:.2f}%"
-                                output += f"\n                        End Limit: {getattr(step, 'end_limit', 0)/100:.2f}%"
-                                output += f"\n                        Curve Type: {getattr(step, 'curve_type', 'N/A')}"
-                                output += f"\n                        Start Point: {getattr(step, 'inicio', 0) * 360 / 1024:.1f}°"
-                                output += f"\n                        In: {getattr(step, 'curve_in', 0)/100:.2f}%"
-                                output += f"\n                        Out: {getattr(step, 'curve_out', 0)/100:.2f}%"
-                                output += f"\n                        Strength: {getattr(step, 'strength', 0)}"
-                                output += f"\n                        Jumps: {getattr(step, 'jumps', 0)}"
+                            output += f"\n                    {getattr(step, 'name', 'Step')}:"
+                            output += f"\n                        Range: {start_deg:.1f}° to {end_deg:.1f}° (width: {width_deg:.1f}°)"
+                            output += f"\n                        Start Limit: {getattr(step, 'start_limit', 0)/100:.2f}%"
+                            output += f"\n                        End Limit: {getattr(step, 'end_limit', 0)/100:.2f}%"
+                            output += f"\n                        Curve Type: {getattr(step, 'curve_type', 'N/A')}"
+                            output += f"\n                        Start Point: {getattr(step, 'inicio', 0) * 360 / 1024:.1f}°"
+                            output += f"\n                        In: {getattr(step, 'curve_in', 0)/100:.2f}%"
+                            output += f"\n                        Out: {getattr(step, 'curve_out', 0)/100:.2f}%"
+                            output += f"\n                        Strength: {getattr(step, 'strength', 0)}"
+                            output += f"\n                        Jumps: {getattr(step, 'jumps', 0)}"
 
     return output
 

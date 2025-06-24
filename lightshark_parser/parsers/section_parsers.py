@@ -481,13 +481,12 @@ def read_order(file_bytes: bytes, ptr: int) -> tuple[Order, int]:
 
     if num_attr != num_attr_indicated:
         raise ValueError(f"Attribute count mismatch in order. Found {num_attr}, expected {num_attr_indicated}")
-    order_obj = Order(**order)
     # set to debug instead of info because there's a lot
-    logging.debug("ORDER FOUND: %s", order_obj.__dict__)
-    return order_obj, ptr
+    logging.debug("ORDER FOUND: %s", order)
+    return order, ptr
 
 
-def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[UserPalette, int]:
+def read_user_palette(file_bytes: bytes, ptr: int, all_palette_orders: dict) -> tuple[UserPalette, int]:
     palette = {}
     palette_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
 
@@ -505,13 +504,16 @@ def read_user_palette(file_bytes: bytes, ptr: int) -> tuple[UserPalette, int]:
             palette[attr_name] = []
             for _ in range(num_orders):
                 order, ptr = read_order(file_bytes, ptr)
-                palette[attr_name].append(order)
+                palette[attr_name].append(Order(**order))
         else:
             raise AttributeError(f"Unexpected attribute {attr_name} found while processing user_palette")
         logging.debug("Found attribute %s with value = %s", attr_name, palette[attr_name])
         num_attr += 1
 
     _obj_checker(initial_ptr, ptr, palette_bytelength, num_attr, num_attr_indicated)
+
+    if "orders" in palette:
+        all_palette_orders[palette["user_palette_id"]] = palette["orders"]
     return UserPalette(**palette), ptr
 
 
@@ -683,7 +685,7 @@ def read_fx(file_bytes: bytes, ptr: int) -> tuple[FX, int]:
     return FX(**fx), ptr
 
 
-def read_cue(file_bytes: bytes, ptr: int) -> tuple[Cue, int]:
+def read_cue(file_bytes: bytes, ptr: int, all_palette_orders: dict[int, list["Order"]]) -> tuple[Cue, int]:
     cue = {}
     cue_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
     attributes = ["fx_palette", "cue_id", "description", "visual_id", "fxs", "actions", "fxs_channels", "orders", "name"]
@@ -746,7 +748,18 @@ def read_cue(file_bytes: bytes, ptr: int) -> tuple[Cue, int]:
             logging.debug("Number of orders: %d", num_orders)
             cue[attr_name] = []
             for _ in range(num_orders):
-                order_obj, ptr = read_order(file_bytes, ptr)
+                order_dict, ptr = read_order(file_bytes, ptr)
+                palette_id = order_dict["palette_id"]
+                # checks if current order found exists as a palette's order already
+                # if so, then replace the order with the palette's order object so they share the same Order
+                if palette_id in all_palette_orders:
+                    for palette_order in all_palette_orders[palette_id]:
+                        if palette_order.to_dict() == order_dict:
+                            order_obj = palette_order
+                            break
+                else:
+                    order_obj = Order(**order_dict)
+
                 cue[attr_name].append(order_obj)
         else:
             raise AttributeError(f"Unexpected attribute {attr_name} found while processing cue")

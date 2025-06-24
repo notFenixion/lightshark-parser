@@ -47,7 +47,20 @@ pip install lightshark-parser
 
 ## Usage
 
-Here's a basic example of how to use lightshark-parser:
+Lightshark Parser can be used both from the command line and using Python code.
+
+### Command line
+
+```bash
+lightshark-parser -p/s <input_file> -o <output_file>
+```
+
+- `-p` : Parse file
+- `-s` : Summarise file
+
+If no output file is provided, output_file will default to `<input_path>.json` or `<input_path>_summarised.txt` depending on the operation selected.
+
+### Code
 
 ```python
 from lightshark_parser import Lightshow, parse_file_bytes

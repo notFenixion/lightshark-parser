@@ -4,7 +4,7 @@ Lightshows/
 *.json
 *.lshw
 *.txt
-
+private_tests/
 tests/analyze_show.py
 
 

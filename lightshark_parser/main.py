@@ -59,6 +59,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     osc_targets = None
 
     ptr = 0
+    all_palette_orders = {}
 
     # num_checked = 0
     # section_headers = [
@@ -161,7 +162,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
             deleted_flag = True
         else:
             deleted_flag = False
-            palette, ptr = read_user_palette(file_bytes, ptr)
+            palette, ptr = read_user_palette(file_bytes, ptr, all_palette_orders)
             if palette.user_palette_id in user_palettes:
                 raise ValueError(f"Duplicate user palette ID found: {palette.user_palette_id}")
             user_palettes[palette.user_palette_id] = palette
@@ -180,7 +181,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
     ptr += 11
     while file_bytes[ptr : ptr + 8] == b"\x00\x00\x00\x04\xa3cue":
         ptr += 8
-        cue, ptr = read_cue(file_bytes, ptr)
+        cue, ptr = read_cue(file_bytes, ptr, all_palette_orders)
         if cue.cue_id in cues:
             raise ValueError(f"Duplicate cue ID found: {cue.cue_id}")
         cues[cue.cue_id] = cue

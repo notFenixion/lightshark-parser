@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Optional, TypedDict
+from typing import Dict, List, Any, Optional, TypedDict, Union
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -198,7 +198,7 @@ class Lightshow:
         from .summariser import format_lightshow
         return format_lightshow(self)
 
-    def to_bytes(self):
+    def to_bytes(self, filepath: Optional[Union[str, Path]] = None) -> bytes:
         logging.debug(f"Starting serialization of Lightshow object")
         bytestr = bytearray()
         if self._fileinfo is not None:
@@ -246,8 +246,18 @@ class Lightshow:
                 bytestr.extend(fxpalette.to_bytes())
         
         bytestr.extend(serialise_section_header("#end#"))
-
-        return bytestr
+        
+        result = bytes(bytestr)
+        
+        # If filepath is provided, write the bytes to the file
+        if filepath is not None:
+            filepath = Path(filepath)
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            with open(filepath, 'wb') as f:
+                f.write(result)
+            logging.info(f"Lightshow saved to {filepath}")
+        
+        return result
 
 
 class FileInfo:
