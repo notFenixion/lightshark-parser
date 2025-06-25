@@ -987,12 +987,12 @@ class Cue:
         string_attrs = ["description", "name"]
         
         for attr_name, attr_value in self.__dict__.items():
-            if attr_name == "fx_palette" or attr_value is not None:
+            if attr_value is not None:
                 content.extend(serialise_attr_name(attr_name))
                 num_attr += 1
                 
                 if attr_name == "fx_palette":
-                    if attr_value is None:
+                    if attr_value == "N/A":
                         content.extend(b'\xFF')
                     else:
                         content.extend(serialise_num_value(attr_value, cc_check=True))
@@ -1350,7 +1350,7 @@ class Cuelist:
             num_attr = 0
             
             num_attrs = [
-                "ms_fadeout", "cue_id", "ms_delay", "next", "dotted_id", "ms_fadein", "ms_crossfade",
+                "ms_fadeout", "cue_id", "ms_delay", "dotted_id", "ms_fadein", "ms_crossfade",
                 "ms_duration"
             ]
             bool_attrs = ["halt"]
@@ -1359,8 +1359,13 @@ class Cuelist:
                 if attr_value is not None:
                     bytestr.extend(serialise_attr_name(attr_name))
                     num_attr += 1
-
-                    if attr_name in num_attrs:
+                    
+                    if attr_name == "next":
+                        if attr_value == "N/A":
+                            bytestr.extend(b'\xFF')
+                        else:
+                            bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                    elif attr_name in num_attrs:
                         bytestr.extend(serialise_num_value(attr_value, cc_check=True))
                     elif attr_name in bool_attrs:
                         bytestr.extend(serialise_bool_value(attr_value))

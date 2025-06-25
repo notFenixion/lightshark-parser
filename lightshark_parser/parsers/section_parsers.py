@@ -695,7 +695,7 @@ def read_cue(file_bytes: bytes, ptr: int, all_palette_orders: dict[int, list["Or
 
         if attr_name in ["fx_palette"]:
             if file_bytes[ptr] == 0xFF:
-                cue[attr_name] = None
+                cue[attr_name] = "N/A"
                 ptr += 1
             else:
                 ptr = _read_number_attribute(file_bytes, ptr, cue, attr_name)
@@ -790,7 +790,13 @@ def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[Cuelist.CuelistEl
     while file_bytes[ptr] != 0x89 and num_attr < 9:
         attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "cuelist_element", element)
 
-        if attr_name in ["cue_id", "next"]:
+        if attr_name == "next":
+            if file_bytes[ptr] == 0xFF:
+                element[attr_name] = "N/A"
+                ptr += 1
+            else:
+                ptr = _read_number_attribute(file_bytes, ptr, element, attr_name)
+        elif attr_name in ["cue_id"]:
             ptr = _read_number_attribute(file_bytes, ptr, element, attr_name)
         elif attr_name in ["halt"]:
             ptr = _read_boolean_attribute(file_bytes, ptr, element, attr_name)
