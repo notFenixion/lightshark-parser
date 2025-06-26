@@ -5,20 +5,9 @@ import sys
 import orjson
 from pathlib import Path
 
-from .classes import Lightshow
-from .parsers.section_parsers import (
-    read_fileinfo,
-    read_model,
-    read_patch,
-    read_group,
-    read_user_palette,
-    read_cue,
-    read_cuelist,
-    read_playback,
-    read_general,
-    read_fxpalette,
-)
-from .utils.custom_errors import MarkerNotFoundError
+from lightshark_parser.classes import Lightshow
+from lightshark_parser.parsers.section_parsers import *
+from lightshark_parser.utils.custom_errors import MarkerNotFoundError
 
 
 def print_dash_line():

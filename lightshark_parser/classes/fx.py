@@ -1,0 +1,390 @@
+from __future__ import annotations
+from typing import Dict, List, Any, Optional
+from lightshark_parser.serialisers.attribute_serialisers import *
+import logging
+
+from lightshark_parser.classes.order import Order
+from lightshark_parser.classes.action import Action
+
+class FX:
+    def __init__(
+        self,
+        cyclos: int = None,
+        direction: int = None,
+        speed: int = None,
+        group_steps: int = None,
+        size: int = None,
+        layers: List[FXLayer] = None,
+        patches: List[int] = None,
+        speed_in_bpm: bool = None,
+        width: int = None,
+        spread: int = None,
+        basic: bool = None,
+        gfxid: int = None,
+        internal_speed: int = None,
+        fx_ref: int = None,
+        splits: int = None,
+        groups: List[int] = None,
+        rect_width: int = None,
+        name: str = None,
+        phase_offset: int = None,
+        bpm: int = None,
+        render_id: int = None,
+        mode: int = None,
+        repeats: int = None,
+        rect_height: int = None,
+    ) -> None:
+        # Attributes ordered to match to_dict()
+        self.cyclos: int = cyclos
+        self.direction: int = direction
+        self.speed: int = speed
+        self.group_steps: int = group_steps
+        self.size: int = size
+        self.layers: List[FXLayer] = layers
+        self.patches: List[int] = patches
+        self.speed_in_bpm: bool = speed_in_bpm
+        self.width: int = width
+        self.spread: int = spread
+        self.basic: bool = basic
+        self.gfxid: int = gfxid
+        self.internal_speed: int = internal_speed
+        self.fx_ref: int = fx_ref
+        self.splits: int = splits
+        self.groups: List[int] = groups
+        self.rect_width: int = rect_width
+        self.name: str = name
+        self.phase_offset: int = phase_offset
+        self.bpm: int = bpm
+        self.render_id: int = render_id
+        self.mode: int = mode
+        self.repeats: int = repeats
+        self.rect_height: int = rect_height
+
+    def to_dict(self) -> dict:
+        return {
+        "cyclos": self.cyclos,
+        "direction": self.direction,
+        "speed": self.speed,
+        "group_steps": self.group_steps,
+        "size": self.size,
+        "layers": [layer.to_dict() for layer in self.layers] if self.layers else [],
+        "patches": self.patches,
+        "speed_in_bpm": self.speed_in_bpm,
+        "width": self.width,
+        "spread": self.spread,
+        "basic": self.basic,
+        "gfxid": self.gfxid,
+        "internal_speed": self.internal_speed,
+        "fx_ref": self.fx_ref,
+        "splits": self.splits,
+        "groups": self.groups,
+        "rect_width": self.rect_width,
+        "name": self.name,
+        "phase_offset": self.phase_offset,
+        "bpm": self.bpm,
+        "render_id": self.render_id,
+        "mode": self.mode,
+        "repeats": self.repeats,
+        "rect_height": self.rect_height
+    }
+
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of FX object {self.name}")
+        bytestr = bytearray()
+        num_attr = 0
+        
+        num_attrs = [
+            "cyclos", "direction", "group_steps", "gfxid", "splits", "rect_width",
+            "render_id", "mode", "repeats", "rect_height", "speed", "size",
+            "width", "spread", "internal_speed", "fx_ref", "phase_offset", "bpm"
+        ]
+        bool_attrs = ["speed_in_bpm", "basic"]
+        string_attrs = ["name"]
+        num_list_attrs = ["patches", "groups"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in bool_attrs:
+                    bytestr.extend(serialise_bool_value(attr_value))
+                elif attr_name in string_attrs:
+                    bytestr.extend(serialise_str_value(attr_value))
+                elif attr_name in num_list_attrs:
+                    bytestr.extend(serialise_num_list(attr_value))
+                elif attr_name == "layers":
+                    num_layers = len(attr_value)
+                    bytestr.extend(serialise_objlist_len(num_layers))
+                    for layer in attr_value:
+                        bytestr.extend(layer.to_bytes())
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        logging.info("FX object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
+
+
+
+class FXLayer:
+        def __init__(
+            self,
+            blind: bool = None,
+            phase_offset: int = None,
+            section: int = None,
+            curve: int = None,
+            steps: List[FXLayerStep] = None,
+            ftypes: List[int] = None,
+            id: int = None,
+            size: int = None,
+        ) -> None:
+            self.blind: bool = blind
+            self.phase_offset: int = phase_offset
+            self.section: int = section
+            self.curve: int = curve
+            self.steps: List[FXLayerStep] = steps
+            self.ftypes: List[int] = ftypes
+            self.id: int = id
+            self.size: int = size
+
+        def to_dict(self) -> dict:
+            steps_list = []
+            for step in self.steps:
+                if hasattr(step, "to_dict"):
+                    steps_list.append(step.to_dict())
+                elif hasattr(step, "__dict__"):
+                    steps_list.append(step.__dict__)
+                else:
+                    steps_list.append(step)
+
+            return {
+                "blind": self.blind,
+                "phase_offset": self.phase_offset,
+                "section": self.section,
+                "curve": self.curve,
+                "steps": steps_list,
+                "ftypes": self.ftypes,
+                "id": self.id,
+                "size": self.size,
+            }
+
+        def to_bytes(self) -> bytes:
+            logging.debug(f"Starting serialization of FXLayer object {self.id}")
+            bytestr = bytearray()
+            num_attr = 0
+            
+            num_attrs = ["id", "phase_offset", "section", "curve", "size"]
+            bool_attrs = ["blind"]
+            num_list_attrs = ["ftypes"]
+            
+            for attr_name, attr_value in self.__dict__.items():
+                if attr_value is not None:
+                    bytestr.extend(serialise_attr_name(attr_name))
+                    num_attr += 1
+
+                    if attr_name in num_attrs:
+                        bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                    elif attr_name in bool_attrs:
+                        bytestr.extend(serialise_bool_value(attr_value))
+                    elif attr_name in num_list_attrs:
+                        bytestr.extend(serialise_num_list(attr_value, cc_check=True))
+                    elif attr_name == "steps":
+                        num_steps = len(attr_value)
+                        bytestr.extend(serialise_objlist_len(num_steps))
+                        for step in attr_value:
+                            bytestr.extend(step.to_bytes())
+
+            bytestr[0:0] = serialise_num_attr(num_attr)
+            logging.info("FXLayer object serialised")
+            logging.debug(bytestr)
+            return bytes(bytestr)
+
+
+class FXLayerStep:
+    def __init__(
+        self,
+        start_limit: int = None,
+        palette_type: int = None,
+        name: str = None,
+        ancho: int = None,
+        curve_in: int = None,
+        curve_out: int = None,
+        strength: int = None,
+        curve_type: int = None,
+        palette_value: Any = None,
+        inicio: int = None,
+        end_limit: int = None,
+        jumps: int = None,
+    ) -> None:
+        self.start_limit: int = start_limit
+        self.palette_type: int = palette_type
+        self.name: str = name
+        self.ancho: int = ancho
+        self.curve_in: int = curve_in
+        self.curve_out: int = curve_out
+        self.strength: int = strength
+        self.curve_type: int = curve_type
+        self.palette_value: Any = palette_value
+        self.inicio: int = inicio
+        self.end_limit: int = end_limit
+        self.jumps: int = jumps
+
+    def to_dict(self) -> dict:
+        return {
+            "start_limit": self.start_limit,
+            "palette_type": self.palette_type,
+            "name": self.name,
+            "ancho": self.ancho,
+            "curve_in": self.curve_in,
+            "curve_out": self.curve_out,
+            "strength": self.strength,
+            "curve_type": self.curve_type,
+            "palette_value": self.palette_value,
+            "inicio": self.inicio,
+            "end_limit": self.end_limit,
+            "jumps": self.jumps,
+        }
+
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of FXLayerStep object {self.name}")
+        bytestr = bytearray()
+        num_attr = 0
+        
+        num_attrs = [
+            "start_limit", "palette_type", "ancho", "curve_in", "curve_out",
+            "strength", "curve_type", "palette_value", "inicio", "end_limit", "jumps"
+        ]
+        string_attrs = ["name"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                bytestr.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+
+                if attr_name in num_attrs:
+                    bytestr.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in string_attrs:
+                    bytestr.extend(serialise_str_value(attr_value))
+
+        bytestr[0:0] = serialise_num_attr(num_attr)
+        logging.info("FXLayerStep object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)
+
+
+
+
+class FXPalette:
+
+    """
+    Basically the same attributes as cue, the only parts where their values differ are
+    cue_id, visual_id, orders
+    """
+
+    def __init__(
+        self,
+        fx_palette: Optional[int] = None,
+        cue_id: Optional[int] = None,
+        description: Optional[str] = None,
+        visual_id: Optional[int] = None,
+        fxs: Optional[List["FX"]] = None,
+        fxs_channels: Optional[List[Dict[str, Any]]] = None,
+        orders: Optional[List[Order]] = None,
+        actions: Optional[List[Action]] = None,
+        name: Optional[str] = None,
+    ) -> None:
+        self.fx_palette: Optional[int] = fx_palette
+        self.cue_id: Optional[int] = cue_id
+        self.description: Optional[str] = description
+        self.visual_id: Optional[int] = visual_id
+        self.fxs: List["FX"] = fxs
+        self.fxs_channels: List[Dict[str, Any]] = fxs_channels 
+        self.orders: List[Order] = orders
+        self.actions: List["Action"] = actions
+        self.name: Optional[str] = name
+
+    def to_dict(self) -> dict:
+        fxs_list = []
+        for fx in self.fxs:
+            if hasattr(fx, "to_dict"):
+                fxs_list.append(fx.to_dict())
+            elif hasattr(fx, "__dict__"):
+                fxs_list.append(fx.__dict__)
+            else:
+                fxs_list.append(fx)
+
+        orders_list = []
+        for order in self.orders:
+            if hasattr(order, "to_dict"):
+                orders_list.append(order.to_dict())
+            elif hasattr(order, "__dict__"):
+                orders_list.append(order.__dict__)
+            else:
+                orders_list.append(order)
+
+        return {
+            "fx_palette": self.fx_palette,
+            "cue_id": self.cue_id,
+            "description": self.description,
+            "visual_id": self.visual_id,
+            "actions": self.actions,
+            "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
+            "fxs_channels": self.fxs_channels,
+            "orders": orders_list,
+            "name": self.name,
+        }
+        
+    def to_bytes(self) -> bytes:
+        logging.debug(f"Starting serialization of FXPalette object {self.name} (id: {self.fx_palette})")
+        bytestr = bytearray(serialise_section_header("fxpalette"))
+        content = bytearray()
+        num_attr = 0
+        
+        num_attrs = ["fx_palette", "cue_id", "visual_id"]
+        string_attrs = ["description", "name"]
+        
+        for attr_name, attr_value in self.__dict__.items():
+            if attr_value is not None:
+                content.extend(serialise_attr_name(attr_name))
+                num_attr += 1
+                
+                if attr_name in num_attrs:
+                    content.extend(serialise_num_value(attr_value, cc_check=True))
+                elif attr_name in string_attrs:
+                    content.extend(serialise_str_value(attr_value))
+                elif attr_name == 'fxs_channels':
+                    num_lists = len(attr_value)
+                    content.extend(serialise_objlist_len(num_lists))
+                    for fx_channel in attr_value:
+                        list_content = bytearray()
+                        logging.debug(fx_channel)
+                        list_len = sum(1 for value in fx_channel if not isinstance(value, str))
+                        if list_len != 16:
+                            raise ValueError(f"FX channel list length should be 16, {list_len} detected (NOTE: unconfirmed. though this error shouldn't happen either way...)")
+                        list_content.extend(serialise_objlist_len(list_len))
+                        for value in fx_channel:
+                            # \xd1 \x?? instances
+                            if isinstance(value, str):
+                                list_content.extend(bytes.fromhex(value))
+                            else:
+                                list_content.extend(serialise_num_value(value, cc_check=True))
+                        content.extend(list_content)
+                elif attr_name == 'fxs':
+                    num_fxs = len(attr_value)
+                    content.extend(serialise_objlist_len(num_fxs))
+                    for fx in attr_value:
+                        content.extend(fx.to_bytes())
+                elif attr_name == 'orders':
+                    num_orders = len(attr_value)
+                    content.extend(serialise_objlist_len(num_orders))
+                    for order in attr_value:
+                        content.extend(order.to_bytes())
+
+        content[0:0] = serialise_num_attr(num_attr)
+        bytestr.extend(serialise_content_length(content))
+        bytestr.extend(content)
+        logging.info("FXPalette object serialised")
+        logging.debug(bytestr)
+        return bytes(bytestr)

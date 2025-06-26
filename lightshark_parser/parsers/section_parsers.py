@@ -1,5 +1,6 @@
+from __future__ import annotations
 import logging
-from .attribute_parsers import (
+from lightshark_parser.parsers.attribute_parsers import (
     _read_boolean_attribute,
     _read_string_attribute,
     _read_list_attribute,
@@ -9,10 +10,10 @@ from .attribute_parsers import (
     _read_number_attribute,
     _read_number
 )
-from ..utils.custom_errors import MarkerNotFoundError
-from ..classes import (
-    FileInfo, Model, ModelValue, ModelValueStep, Macro, MacroStep, Patch, Group, UserPalette, Cue, Order, FX,
-    Cuelist, Playback, General, FXPalette, ModelPalette, ModelHardware, Macro, MacroStep
+from lightshark_parser.utils.custom_errors import MarkerNotFoundError
+from lightshark_parser.classes import (
+    FileInfo, Model, ModelPalette, ModelHardware, ModelValue, ModelValueStep, Macro, MacroStep, Patch, Group, UserPalette, Cue, Order, FX, FXLayer, FXLayerStep, FXPalette,
+    Cuelist, CuelistElement, Playback, General, Action
 )
 
 
@@ -139,7 +140,7 @@ def read_model_hardware(file_bytes: bytes, ptr: int) -> tuple[ModelHardware, int
         num_attr += 1
     return ModelHardware(**hardware), ptr
 
-def read_model_macro(file_bytes: bytes, ptr: int) -> tuple["Macro", int]:
+def read_model_macro(file_bytes: bytes, ptr: int) -> tuple[Macro, int]:
 
 
     macro = {}
@@ -517,7 +518,7 @@ def read_user_palette(file_bytes: bytes, ptr: int, all_palette_orders: dict) -> 
     return UserPalette(**palette), ptr
 
 
-def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[FX.FXLayerStep, int]:
+def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[FXLayerStep, int]:
     logging.debug("-" * 40 + " Parsing FX Layer Step " + "-" * 40)
     if file_bytes[ptr] != 0x8C:
         raise ValueError(f"Incorrect number of attributes specified for step in FX layer. Expected 0x8C, got {hex(file_bytes[ptr])}")
@@ -566,10 +567,10 @@ def read_fx_layer_steps(file_bytes: bytes, ptr: int) -> tuple[FX.FXLayerStep, in
     if num_attr != num_attr_indicated:
         raise ValueError(f"Attribute count mismatch in step. Found {num_attr}, expected {num_attr_indicated}")
     logging.debug("-" * 40 + " End FX Layer Step " + "-" * 43)
-    return FX.FXLayerStep(**step), ptr
+    return FXLayerStep(**step), ptr
 
 
-def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[FX.FXLayer, int]:
+def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[FXLayer, int]:
     logging.debug("=" * 45 + " Parsing FX Layer " + "=" * 45)
     if file_bytes[ptr] != 0x88:
         raise ValueError(f"Incorrect number of attributes specified for layer in FX. Expected 0x88, got {hex(file_bytes[ptr])}")
@@ -605,7 +606,7 @@ def read_fx_layer(file_bytes: bytes, ptr: int) -> tuple[FX.FXLayer, int]:
     if num_attr != num_attr_indicated:
         raise ValueError(f"Attribute count mismatch in layer. Found {num_attr}, expected {num_attr_indicated}")
     logging.debug("=" * 45 + " End FX Layer " + "=" * 48)
-    return FX.FXLayer(**layer), ptr
+    return FXLayer(**layer), ptr
 
 
 def read_fx(file_bytes: bytes, ptr: int) -> tuple[FX, int]:
@@ -770,7 +771,7 @@ def read_cue(file_bytes: bytes, ptr: int, all_palette_orders: dict[int, list["Or
     return Cue(**cue), ptr
 
 
-def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[Cuelist.CuelistElement, int]:
+def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[CuelistElement, int]:
     element = {}
     if file_bytes[ptr] != 0x89:
         raise ValueError(f"Incorrect number of attributes specified for cuelist element. Expected 0x89, got {hex(file_bytes[ptr])}")
@@ -810,7 +811,7 @@ def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[Cuelist.CuelistEl
     if num_attr != 9:
         raise ValueError(f"Incorrect number of attributes for cuelist element. Found {num_attr}, expected 9")
 
-    return Cuelist.CuelistElement(**element), ptr
+    return CuelistElement(**element), ptr
 
 
 def read_cuelist(file_bytes: bytes, ptr: int) -> tuple[Cuelist, int]:
