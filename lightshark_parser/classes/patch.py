@@ -8,7 +8,7 @@ class Patch:
         model_id: Optional[int] = None,
         inverse_tilt: Optional[bool] = None,
         name: Optional[str] = None,
-        channels_ftype: Optional[List[str]] = None,
+        channels_ftype: Optional[List[int]] = None,
         index: Optional[int] = None,
         universe: Optional[int] = None,
         description: Optional[str] = None,
@@ -40,6 +40,7 @@ class Patch:
         self.id: Optional[int] = id
         self.size: Optional[int] = size
         self.frozen: Optional[int] = frozen
+
 
     def to_dict(self) -> dict:
         return {

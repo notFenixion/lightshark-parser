@@ -16,21 +16,18 @@ def print_dash_line():
     except:
         logging.info("-" * 80)
 
-def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
-    if not filepath.lower().endswith(".lshw"):
+def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str = None) -> Lightshow:
+    """
+    Parse a LightShark .lshw file from bytes.
+    Args:
+        file_bytes: The bytes of the .lshw file.
+        filepath: Optional, for logging/metadata only.
+        output_file: Optional, path to save parsed JSON.
+    Returns:
+        Lightshow object.
+    """
+    if filepath and not filepath.lower().endswith(".lshw"):
         print("Error: File must have be of extension .lshw", file=sys.stderr)
-        sys.exit(1)
-    try:
-        with open(filepath, "rb") as file:
-            file_bytes = file.read()
-    except FileNotFoundError:
-        print(f"Error: File '{filepath}' not found.", file=sys.stderr)
-        sys.exit(1)
-    except PermissionError:
-        print(f"Error: Permission denied when accessing '{filepath}'.", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
 
     fileinfo = None
@@ -66,7 +63,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
 
 
 
-
+    print("Starting parsing...")
     ## FILEINFO ##
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#fileinfo#":
         logging.warning("Could not find #fileinfo# in file. If your file contains a fileinfo section, please fix it.")
@@ -79,7 +76,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         print_dash_line()
 
     ## MODELS ##
-    logging.info("Finished reading fileinfo. Moving onto models...")
+    print("Finished reading fileinfo. Moving onto models...")
     if file_bytes[ptr : ptr + 13] != b"\x00\x00\x00\x09\xa8#models#":
         raise MarkerNotFoundError("Could not find #models# in file")
     models = {}
@@ -115,7 +112,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         )
 
     ## GROUPS ##
-    logging.info("Finished reading patches. Moving onto groups...")
+    print("Finished reading patches. Moving onto groups...")
     # initial check for if there are groups at all
     if file_bytes[ptr : ptr + 10] == b"\x00\x00\x00\x06\xa5group":
         groups = {}
@@ -131,7 +128,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         logging.warning("No groups found in file. This warning is only a concern if there are groups in your show but none were detected.")
 
     ## USER PALETTES ##
-    logging.info("Finished reading groups. Moving onto user palettes...")
+    print("Finished reading groups. Moving onto user palettes...")
     # logging.debug(file_bytes[ptr:ptr+20])
     if file_bytes[ptr : ptr + 20] != b"\x00\x00\x00\x10\xaf#user_palettes#":
         raise MarkerNotFoundError("Could not find #user_palettes# in file")
@@ -148,6 +145,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
                 "user_palette marker '\\x00\\x00\\x0d\\xacuser_palette' was found at position %d instead of expected '\\x00\\x00\\x00\\x0d\\xacuser_palette'. This may be a case wherein a user_palette was deleted and is thus ignored. It is recommended to check for missing user_palette_ids",
                 ptr
             )
+            print("Potential deleted palette found. Recommended to check for any missing 'user_palette_id' values.")
             deleted_flag = True
         else:
             deleted_flag = False
@@ -163,7 +161,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         )
 
     ## CUES ##
-    logging.info("Finished reading user palettes. Moving onto cues...")
+    print("Finished reading user palettes. Moving onto cues...")
     if file_bytes[ptr : ptr + 11] != b"\x00\x00\x00\x07\xa6#cues#":
         raise MarkerNotFoundError("Could not find #cues# in file")
     cues = {}
@@ -180,7 +178,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         logging.warning("No cues found in file. This warning is only a concern if there are cues in your show but none were detected.")
 
     ## CUELISTS ##
-    logging.info("Finished reading cues. Moving onto cuelists...")
+    print("Finished reading cues. Moving onto cuelists...")
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#cuelists#":
         raise MarkerNotFoundError("Could not find #cuelists# in file")
     cuelists = {}
@@ -199,7 +197,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         )
 
     ## PLAYBACKS ##
-    logging.info("Finished reading cuelists. Moving onto playbacks...")
+    print("Finished reading cuelists. Moving onto playbacks...")
     if file_bytes[ptr : ptr + 16] != b"\x00\x00\x00\x0c\xab#playbacks#":
         raise MarkerNotFoundError("Could not find #playbacks# in file")
     playbacks = {}
@@ -218,7 +216,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         )
 
     ## GENERAL ##
-    logging.info("Finished reading playbacks. Moving onto general...")
+    print("Finished reading playbacks. Moving onto general...")
     if file_bytes[ptr : ptr + 14] != b"\x00\x00\x00\x0a\xa9#general#":
         raise MarkerNotFoundError("Could not find #general# in file")
     ptr += 14
@@ -231,7 +229,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
         logging.warning("No general found in file. This warning is only a concern if there is general in your show but none were detected.")
 
     ## FX PALETTES ##
-    logging.info("Finished reading general. Moving onto FX palettes...")
+    print("Finished reading general. Moving onto FX palettes...")
     if file_bytes[ptr : ptr + 17] != b"\x00\x00\x00\x0d\xac#fxpalettes#":
         logging.warning("Could not find #fxpalettes# in file.")
     else:
@@ -280,7 +278,7 @@ def parse_file_bytes(filepath: str, output_file: str = None) -> Lightshow:
                 with open(output_path, "wb") as f:
                     f.write(json_bytes)
 
-                print(f"Successfully saved to {output_path}")
+                logging.info(f"Successfully saved to {output_path}")
 
             except TypeError as e:
                 logging.error("TypeError during JSON serialization: %s", e)
@@ -379,14 +377,18 @@ def main():
     try:
         if args.parse:
             output_file = args.output or f"{os.path.splitext(args.input_file)[0]}.json"
-            lightshow = parse_file_bytes(args.input_file, output_file)
+            with open(args.input_file, "rb") as f:
+                file_bytes = f.read()
+            lightshow = parse_file_bytes(file_bytes, filepath=args.input_file, output_file=output_file)
 
             if not args.output and not args.verbose:
                 print(f"No output file specified. Output saved to: {output_file}")
 
         elif args.summarise:
             output_file = args.output or f"{os.path.splitext(args.input_file)[0]}_summary.txt"
-            lightshow = parse_file_bytes(args.input_file)  # Parse but don't output JSON
+            with open(args.input_file, "rb") as f:
+                file_bytes = f.read()
+            lightshow = parse_file_bytes(file_bytes, filepath=args.input_file)  # Parse but don't output JSON
             summary = lightshow.summarise()
 
             # Write summary to file

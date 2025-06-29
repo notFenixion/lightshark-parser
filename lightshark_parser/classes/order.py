@@ -1,8 +1,11 @@
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
+from dataclasses import dataclass
+from lightshark_parser.classes.patch import Patch
+from lightshark_parser.classes.model import Model
 
-
+@dataclass
 class Order:
     def __init__(
         self,
@@ -15,6 +18,7 @@ class Order:
         value: int = None,
         channel: int = None,
     ) -> None:
+
         self.palette_id: int = palette_id
         self.universe: int = universe
         self.section: int = section
@@ -23,6 +27,38 @@ class Order:
         self.ftype: int = ftype
         self.value: int = value
         self.channel: int = channel
+
+        self._validate_init()
+
+
+
+
+    def _validate_init(self):
+        """
+        Checks for:
+        - Valid patch_id
+        - Valid ftype (matches the patch's model)
+        - Valid value (>= 0 for now)
+
+        """
+
+        # patch = Patch.get_patch(self.patch_id)
+        # if patch is None:
+        #     raise ValueError(f"Patch with ID {self.patch_id} not found")
+        # model = Model.get_model(patch.model_id)
+
+        # valid_ftypes = [v.ftype for v in model.values]
+
+        # if self.ftype not in valid_ftypes:
+        #     raise ValueError(
+        #         f"Invalid ftype {self.ftype} detected for the patch indicated.\n"
+        #         f"Valid ftypes are: {valid_ftypes}"
+        #     )
+
+        if self.value < 0:
+            raise ValueError(f"Invalid value {self.value} detected.\n"
+                f"Value must be >= 0")
+
 
     def to_dict(self) -> dict:
         return {

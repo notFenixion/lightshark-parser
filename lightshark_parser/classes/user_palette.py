@@ -1,6 +1,7 @@
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
+from lightshark_parser.classes.order import Order
 
 
 class UserPalette:

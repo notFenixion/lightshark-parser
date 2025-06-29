@@ -18,7 +18,7 @@ from lightshark_parser.classes.general import General
 class Lightshow:
     def __init__(
         self,
-        filepath: str,
+        filepath: str = None,
         fileinfo: FileInfo = None,
         models: Dict[Any, Model] = None,
         patches: Dict[Any, Patch] = None,
@@ -29,18 +29,24 @@ class Lightshow:
         playbacks: Dict[Any, Playback] = None,
         fxpalettes: Dict[Any, FXPalette] = None,
         general: General = None,
-    ):
-        self._filepath = Path(filepath)
-        if not self._filepath.exists():
-            raise FileNotFoundError(f"File {filepath} does not exist")
-        self._filename = self._filepath.name
-        stats = self._filepath.stat()
-        created_at = datetime.fromtimestamp(stats.st_ctime)
-        modified_at = datetime.fromtimestamp(stats.st_mtime)
-        self._parsed_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self._created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
-        self._modified_at = modified_at.strftime("%Y-%m-%d %H:%M:%S")
+    ):  
+        if filepath is not None:
+            self._filepath = Path(filepath)
+            if not self._filepath.exists():
+                raise FileNotFoundError(f"File {filepath} does not exist")
+            self._filename = self._filepath.name
+            stats = self._filepath.stat()
+            created_at = datetime.fromtimestamp(stats.st_ctime)
+            modified_at = datetime.fromtimestamp(stats.st_mtime)
+            self._created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
+            self._modified_at = modified_at.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            self._filepath = None
+            self._filename = None
+            self._created_at = None
+            self._modified_at = None
 
+        self._parsed_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._fileinfo: FileInfo = fileinfo
         self._models: Dict[Any, Model] = models
         self._patches: Dict[Any, Patch] = patches
@@ -110,10 +116,17 @@ class Lightshow:
         
     @groups.setter
     def groups(self, value: Dict[Any, Group]) -> None:
+
         for group in value.values():
             if group.__class__.__name__ != 'Group':
                 raise TypeError("All group values must be Group objects")
         self._groups = value
+
+    def add_group(self, group: Group) -> None:
+        if group.__class__.__name__ != 'Group':
+            raise TypeError("Parameter given must be a Group object")
+        self._groups[group.group_id] = group
+    
         
     @property
     def user_palettes(self) -> Dict[Any, UserPalette]:
@@ -267,3 +280,38 @@ class Lightshow:
             logging.info(f"Lightshow saved to {filepath}")
         
         return result
+
+    def add_patch(self, patch: Patch) -> None:
+        if patch.id in self._patches:
+            raise ValueError(f"Duplicate patch ID: {patch.id}")
+        self._patches[patch.id] = patch
+
+    def add_cue(self, cue: Cue) -> None:
+        if cue.cue_id in self._cues:
+            raise ValueError(f"Duplicate cue ID: {cue.cue_id}")
+        self._cues[cue.cue_id] = cue
+
+    def add_model(self, model: Model) -> None:
+        if model.model_id in self._models:
+            raise ValueError(f"Duplicate model ID: {model.model_id}")
+        self._models[model.model_id] = model
+
+    def add_user_palette(self, palette: UserPalette) -> None:
+        if palette.user_palette_id in self._user_palettes:
+            raise ValueError(f"Duplicate user_palette_id: {palette.user_palette_id}")
+        self._user_palettes[palette.user_palette_id] = palette
+
+    def add_cuelist(self, cuelist: Cuelist) -> None:
+        if cuelist.cuelist_id in self._cuelists:
+            raise ValueError(f"Duplicate cuelist ID: {cuelist.cuelist_id}")
+        self._cuelists[cuelist.cuelist_id] = cuelist
+
+    def add_playback(self, playback: Playback) -> None:
+        if playback.combined_id in self._playbacks:
+            raise ValueError(f"Duplicate playback ID: {playback.combined_id}")
+        self._playbacks[playback.combined_id] = playback
+
+    def add_fxpalette(self, fxpalette: FXPalette) -> None:
+        if fxpalette.fx_palette in self._fxpalettes:
+            raise ValueError(f"Duplicate FX palette ID: {fxpalette.fx_palette}")
+        self._fxpalettes[fxpalette.fx_palette] = fxpalette

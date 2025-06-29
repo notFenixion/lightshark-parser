@@ -1,12 +1,11 @@
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
-from .fx import FX
-from .order import Order
-
+from lightshark_parser.classes.fx import FX
+from lightshark_parser.classes.order import Order
+from lightshark_parser.classes.action import Action
 
 class Cue:
-
     """
 
 

@@ -9,7 +9,8 @@ def format_lightshow(lightshow: Lightshow) -> str:
             format_user_palettes(lightshow) + "\n\n" +
             format_fx_palettes(lightshow) + "\n\n" +
             format_cues(lightshow) + "\n\n" +
-            format_cuelists(lightshow)
+            format_cuelists(lightshow) + "\n\n" +
+            format_models(lightshow) + "\n\n"
         )
 
 
@@ -21,11 +22,11 @@ Date parsed: {lightshow.parsed_date}
 Creation Date: {lightshow.created_at}
 Last Modified: {lightshow.modified_at}
 
-Fixtures: {len(lightshow.patches)}
-Cues: {len(lightshow.cues)}
-Cuelists: {len(lightshow.cuelists)}
-FX Palettes: {len(lightshow.fxpalettes)}
-User Palettes: {len(lightshow.user_palettes)}"""
+Fixtures: {len(lightshow.patches) if lightshow.patches else 0}
+Cues: {len(lightshow.cues) if lightshow.cues else 0}
+Cuelists: {len(lightshow.cuelists) if lightshow.cuelists else 0}
+FX Palettes: {len(lightshow.fxpalettes) if lightshow.fxpalettes else 0}
+User Palettes: {len(lightshow.user_palettes) if lightshow.user_palettes else 0}"""
 
 
 def format_patches(lightshow: Lightshow) -> str:
@@ -502,5 +503,28 @@ def format_cuelists(lightshow: Lightshow) -> str:
                     f"Fade Out: {fade_out} | "
                     f"Next Cue: {next_cue}"
                 )
+    
+    return output
+
+
+def format_models(lightshow: Lightshow) -> str:
+    output = "===== MODELS ====="
+    
+    if not lightshow.models:
+        return output + "\n\nNo models found."
+    
+    for model_id, model in sorted(lightshow.models.items()):
+        output += f"\n\n{model.name} (ID:{model_id})"
+        output += f"\n    Values:"
+        
+        if not model.values:
+            output += " No values defined."
+            continue
+        value_dict = {}
+        for value in model.values:
+            value_dict[value.ftype] = value.description
+
+        for ftype, desc in sorted(value_dict.items()):
+            output += f"\n        {desc} (FType: {ftype} - 0x{ftype:04X})"
     
     return output

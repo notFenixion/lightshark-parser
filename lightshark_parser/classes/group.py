@@ -1,29 +1,74 @@
-
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
 
 
 class Group:
+
+    """
+    Compulsory attributes: patched_elements_ids
+    Optional attributes (defaults): 
+        description = "Group {group_id}"
+        color_mark = 0
+        visual_id = max(Group._all_visual_ids) + 1
+        grid = linear
+        steps = 0
+        automatico = False
+        group_id = max(Group._all_groups.keys(), default=0) + 1
+
+    """
+
     def __init__(
         self,
+        patched_elements_ids: List[int],
         description: Optional[str] = None,
-        color_mark: Optional[int] = None,
+        color_mark: int = 0,
         visual_id: Optional[int] = None,
-        patched_elements_ids: Optional[List[int]] = None,
         grid: Optional[Dict[int, List[int]]] = None,
         steps: Optional[Dict[int, int]] = None,
-        automatico: Optional[bool] = None,
+        automatico: bool = False,
         group_id: Optional[int] = None,
     ) -> None:
-        self.description: Optional[str] = description
-        self.color_mark: Optional[int] = color_mark
-        self.visual_id: Optional[int] = visual_id
-        self.patched_elements_ids: List[int] = patched_elements_ids
-        self.grid: Dict[int, List[int]] = grid
-        self.steps: Dict[int, int] = steps
-        self.automatico: Optional[bool] = automatico
-        self.group_id: Optional[int] = group_id
+
+        # If description not given, auto-assign to "Group {group_id}"
+        if description is None:
+            description = f"Group {group_id}"
+
+        # If no grid, defaults to linear
+        if grid is None:
+            grid = {}
+            for i, fixture_id in enumerate(patched_elements_ids, start=0):
+                grid[fixture_id] = [0, i]
+        else:
+            for fixture_id, fixture_pos in grid.items():
+                if fixture_id not in patched_elements_ids:
+                    raise ValueError(f"Fixture ID {fixture_id} not found in patched_elements_ids")
+                if len(fixture_pos) != 2 or not all(isinstance(x, int) for x in fixture_pos):
+                    raise ValueError(f"Fixture position {fixture_pos} must be a list of 2 integers")
+                if list(grid.values()).count(fixture_pos) > 1:
+                    raise ValueError(f"Duplicate fixture position {fixture_pos}")
+
+        # If no step, defaults to 0 (all same priority in playback order)
+        if steps is None:
+            steps = {}
+            for fixture_id in patched_elements_ids:
+                steps[fixture_id] = 0
+        else:
+            for fixture_id, step in steps.items():
+                if fixture_id not in patched_elements_ids:
+                    raise ValueError(f"Fixture ID {fixture_id} not found in patched_elements_ids")
+                if not isinstance(step, int):
+                    raise ValueError(f"Step {step} must be an integer")
+
+
+        self.description = description
+        self.color_mark = color_mark
+        self.visual_id = visual_id
+        self.patched_elements_ids = patched_elements_ids
+        self.grid = grid
+        self.steps = steps
+        self.automatico = automatico
+        self.group_id = group_id
 
     def to_dict(self) -> dict:
         return {
@@ -80,3 +125,6 @@ class Group:
         logging.info("Group object serialised")
         logging.debug(bytestr)
         return bytes(bytestr)
+
+
+

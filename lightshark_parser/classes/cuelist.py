@@ -5,34 +5,37 @@ import logging
 
 class Cuelist:
 
-
     def __init__(
         self,
-        ms_flash_attack: Optional[int] = None,
-        autoreset: Optional[bool] = None,
-        at_end_pause: Optional[bool] = None,
-        loops: Optional[int] = None,
-        chase: Optional[bool] = None,
-        ms_chase_time: Optional[int] = None,
+        ms_flash_attack: Optional[int] = 2000,
+        autoreset: Optional[bool] = True,
+        at_end_pause: Optional[bool] = False,
+        loops: Optional[int] = 1,
+        chase: Optional[bool] = False,
+        ms_chase_time: Optional[int] = 2000,
         visual_id: Optional[int] = None,
-        bpm_chase: Optional[int] = None,
-        ms_flash_decay: Optional[int] = None,
-        pcrossfade: Optional[int] = None,
-        ms_fadeout: Optional[int] = None,
-        direction: Optional[int] = None,
-        at_end_stop: Optional[bool] = None,
-        flash_mode: Optional[int] = None,
+        bpm_chase: Optional[int] = 30000,
+        ms_flash_decay: Optional[int] = 2000,
+        pcrossfade: Optional[int] = 100000,
+        ms_fadeout: Optional[int] = 2000,
+        direction: Optional[int] = 0,
+        at_end_stop: Optional[bool] = False,
+        flash_mode: Optional[int] = 0,
         cuelist_id: Optional[int] = None,
-        ms_fadein: Optional[int] = None,
-        ms_crossfade: Optional[int] = None,
-        no_first_fade: Optional[bool] = None,
+        ms_fadein: Optional[int] = 2000,
+        ms_crossfade: Optional[int] = 2000,
+        no_first_fade: Optional[bool] = False,
         name: Optional[str] = None,
-        block_fx: Optional[bool] = None,
-        cuelist_elements: Optional[List[CuelistElement]] = None,
-        ms_flash_hold: Optional[int] = None,
-        ms_stop_time: Optional[int] = None,
+        block_fx: Optional[bool] = False,
+        cuelist_elements: Optional[List[CuelistElement]] = [],
+        ms_flash_hold: Optional[int] = 2000,
+        ms_stop_time: Optional[int] = 2000,
     ) -> None:
-        # Match the order from to_dict()
+        
+        if name is None:
+            name = f"Cuelist {cuelist_id}"
+
+
         self.ms_flash_attack: Optional[int] = ms_flash_attack
         self.autoreset: Optional[bool] = autoreset
         self.at_end_pause: Optional[bool] = at_end_pause

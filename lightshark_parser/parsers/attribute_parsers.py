@@ -103,7 +103,6 @@ def _read_string_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: st
         return ptr + 1 + str_len
     # Case where xDA + 2 bytes for length
     else:
-        print("String attribute length indicator %s found at position %d", hex(file_bytes[ptr]), ptr)
         if file_bytes[ptr] != 0xDA:
             raise ValueError(f"Invalid string attribute length indicator. Expected 0xDA, got {hex(file_bytes[ptr])}")
         if ptr + 3 > len(file_bytes):

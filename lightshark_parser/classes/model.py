@@ -226,7 +226,7 @@ class ModelValue:
 class Model:
     def __init__(
         self,
-        model_id: int,
+        model_id: Optional[int] = None,
         palette: Optional[Dict[str, ModelPalette]] = None,
         name: Optional[str] = None,
         short_name: Optional[str] = None,
@@ -241,6 +241,7 @@ class Model:
         virtual_dimmer_channels: Optional[List[int]] = None,
         size: Optional[int] = None,
     ) -> None:
+
         self.model_id = model_id
         self.palette = palette
         self.name = name
