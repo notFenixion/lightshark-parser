@@ -1,9 +1,9 @@
+from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
 
-class General:
-    class Config:
+class Config:
         def __init__(
             self,
             update_mode: Optional[int] = None,
@@ -22,6 +22,16 @@ class General:
             self.show_password: Optional[str] = show_password
             self.show_password_enabled: Optional[bool] = show_password_enabled
 
+        def __repr__(self):
+            return (
+                f"Config(update_mode={self.update_mode!r}, "
+                f"executors_exclusive_mode={self.executors_exclusive_mode!r}, "
+                f"remove_non_empty_cuelist={self.remove_non_empty_cuelist!r}, "
+                f"clear_ltp={self.clear_ltp!r}, bpm_mode={self.bpm_mode!r}, "
+                f"show_password={self.show_password!r}, show_password_enabled={self.show_password_enabled!r})"
+            )
+        
+
         def to_dict(self) -> dict:
             return {
                 "update_mode": self.update_mode,
@@ -33,8 +43,20 @@ class General:
                 "show_password_enabled": self.show_password_enabled
             }
 
+        @classmethod
+        def from_dict(cls, data: Dict[str, Any]) -> "Config":
+            return cls(
+                update_mode=data.get("update_mode"),
+                executors_exclusive_mode=data.get("executors_exclusive_mode"),
+                remove_non_empty_cuelist=data.get("remove_non_empty_cuelist"),
+                clear_ltp=data.get("clear_ltp"),
+                bpm_mode=data.get("bpm_mode"),
+                show_password=data.get("show_password"),
+                show_password_enabled=data.get("show_password_enabled"),
+            )
+
         def to_bytes(self) -> bytes:
-            logging.debug("Starting serialisation of General.Config object")
+            logging.debug("Starting serialisation of Config object")
             bytestr = bytearray(serialise_section_header("config"))
             content = bytearray()
             num_attr = 0
@@ -58,17 +80,27 @@ class General:
             content[0:0] = serialise_num_attr(num_attr)
             bytestr.extend(serialise_content_length(content))
             bytestr.extend(content)
-            logging.info("General.Config object serialised")
+            logging.info("Config object serialised")
             logging.debug(bytestr)
             return bytes(bytestr)
 
+class General:
+
     def __init__(self, config: Optional[Config] = None) -> None:
-        self.config: Optional[General.Config] = config
+        self.config: Optional[Config] = config
+
+    def __repr__(self):
+        return f"General(config={self.config!r})"
 
     def to_dict(self) -> dict:
         return {
             "config": self.config.to_dict() if self.config else None
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "General":
+        config = Config.from_dict(data.get("config"))
+        return cls(config=config)
 
     def to_bytes(self) -> bytes:
         logging.debug("Starting serialisation of General object")

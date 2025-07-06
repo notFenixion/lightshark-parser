@@ -60,6 +60,19 @@ class FX:
         self.repeats: int = repeats
         self.rect_height: int = rect_height
 
+
+    def __repr__(self):
+        return (
+            f"FX(cyclos={self.cyclos!r}, direction={self.direction!r}, speed={self.speed!r}, "
+            f"group_steps={self.group_steps!r}, size={self.size!r}, layers={self.layers!r}, "
+            f"patches={self.patches!r}, speed_in_bpm={self.speed_in_bpm!r}, width={self.width!r}, "
+            f"spread={self.spread!r}, basic={self.basic!r}, gfxid={self.gfxid!r}, "
+            f"internal_speed={self.internal_speed!r}, fx_ref={self.fx_ref!r}, splits={self.splits!r}, "
+            f"groups={self.groups!r}, rect_width={self.rect_width!r}, name='{self.name}', "
+            f"phase_offset={self.phase_offset!r}, bpm={self.bpm!r}, render_id={self.render_id!r}, "
+            f"mode={self.mode!r}, repeats={self.repeats!r}, rect_height={self.rect_height!r})"
+        )
+
     def to_dict(self) -> dict:
         return {
         "cyclos": self.cyclos,
@@ -87,6 +100,38 @@ class FX:
         "repeats": self.repeats,
         "rect_height": self.rect_height
     }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FX":
+        if data is None:
+            return None
+        layers = [FXLayer.from_dict(layer) for layer in data.get("layers", [])]
+        return cls(
+            cyclos=data.get("cyclos"),
+            direction=data.get("direction"),
+            speed=data.get("speed"),
+            group_steps=data.get("group_steps"),
+            size=data.get("size"),
+            layers=layers,
+            patches=data.get("patches"),
+            speed_in_bpm=data.get("speed_in_bpm"),
+            width=data.get("width"),
+            spread=data.get("spread"),
+            basic=data.get("basic"),
+            gfxid=data.get("gfxid"),
+            internal_speed=data.get("internal_speed"),
+            fx_ref=data.get("fx_ref"),
+            splits=data.get("splits"),
+            groups=data.get("groups"),
+            rect_width=data.get("rect_width"),
+            name=data.get("name"),
+            phase_offset=data.get("phase_offset"),
+            bpm=data.get("bpm"),
+            render_id=data.get("render_id"),
+            mode=data.get("mode"),
+            repeats=data.get("repeats"),
+            rect_height=data.get("rect_height"),
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of FX object {self.name}")
@@ -149,6 +194,13 @@ class FXLayer:
             self.id: int = id
             self.size: int = size
 
+        def __repr__(self):
+            return (
+                f"FXLayer(blind={self.blind!r}, phase_offset={self.phase_offset!r}, "
+                f"section={self.section!r}, curve={self.curve!r}, steps={self.steps!r}, "
+                f"ftypes={self.ftypes!r}, id={self.id!r}, size={self.size!r})"
+            )
+
         def to_dict(self) -> dict:
             steps_list = []
             for step in self.steps:
@@ -169,6 +221,20 @@ class FXLayer:
                 "id": self.id,
                 "size": self.size,
             }
+
+        @classmethod
+        def from_dict(cls, data: Dict[str, Any]) -> "FXLayer":
+            steps = [FXLayerStep.from_dict(step) for step in data.get("steps", [])]
+            return cls(
+                blind=data.get("blind"),
+                phase_offset=data.get("phase_offset"),
+                section=data.get("section"),
+                curve=data.get("curve"),
+                steps=steps,
+                ftypes=data.get("ftypes"),
+                id=data.get("id"),
+                size=data.get("size"),
+            )
 
         def to_bytes(self) -> bytes:
             logging.debug(f"Starting serialization of FXLayer object {self.id}")
@@ -231,6 +297,15 @@ class FXLayerStep:
         self.end_limit: int = end_limit
         self.jumps: int = jumps
 
+    def __repr__(self):
+        return (
+            f"FXLayerStep(start_limit={self.start_limit!r}, palette_type={self.palette_type!r}, "
+            f"name='{self.name}', ancho={self.ancho!r}, curve_in={self.curve_in!r}, "
+            f"curve_out={self.curve_out!r}, strength={self.strength!r}, "
+            f"curve_type={self.curve_type!r}, palette_value={self.palette_value!r}, "
+            f"inicio={self.inicio!r}, end_limit={self.end_limit!r}, jumps={self.jumps!r})"
+        )
+
     def to_dict(self) -> dict:
         return {
             "start_limit": self.start_limit,
@@ -246,6 +321,23 @@ class FXLayerStep:
             "end_limit": self.end_limit,
             "jumps": self.jumps,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FXLayerStep":
+        return cls(
+            start_limit=data.get("start_limit"),
+            palette_type=data.get("palette_type"),
+            name=data.get("name"),
+            ancho=data.get("ancho"),
+            curve_in=data.get("curve_in"),
+            curve_out=data.get("curve_out"),
+            strength=data.get("strength"),
+            curve_type=data.get("curve_type"),
+            palette_value=data.get("palette_value"),
+            inicio=data.get("inicio"),
+            end_limit=data.get("end_limit"),
+            jumps=data.get("jumps"),
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of FXLayerStep object {self.name}")
@@ -305,6 +397,14 @@ class FXPalette:
         self.actions: List["Action"] = actions
         self.name: Optional[str] = name
 
+    def __repr__(self):
+        return (
+            f"FXPalette(fx_palette={self.fx_palette!r}, cue_id={self.cue_id!r}, "
+            f"description={self.description!r}, visual_id={self.visual_id!r}, "
+            f"fxs={self.fxs!r}, fxs_channels={self.fxs_channels!r}, "
+            f"orders={self.orders!r}, actions={self.actions!r}, name={self.name!r})"
+        )
+
     def to_dict(self) -> dict:
         fxs_list = []
         for fx in self.fxs:
@@ -335,6 +435,25 @@ class FXPalette:
             "orders": orders_list,
             "name": self.name,
         }
+        
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FXPalette":
+        if data is None:
+            return None
+        fxs = [FX.from_dict(fx) for fx in data.get("fxs", [])] if data.get("fxs") else None
+        orders = [Order.from_dict(order) for order in data.get("orders", [])]
+        actions = [Action.from_dict(action) for action in data.get("actions", [])] if data.get("actions") else None
+        return cls(
+            fx_palette=data.get("fx_palette"),
+            cue_id=data.get("cue_id"),
+            description=data.get("description"),
+            visual_id=data.get("visual_id"),
+            fxs=fxs,
+            fxs_channels=data.get("fxs_channels"),
+            orders=orders,
+            actions=actions,
+            name=data.get("name"),
+        )
         
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of FXPalette object {self.name} (id: {self.fx_palette})")

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
@@ -70,6 +71,14 @@ class Group:
         self.automatico = automatico
         self.group_id = group_id
 
+    def __repr__(self):
+        return (
+            f"Group(description={self.description!r}, color_mark={self.color_mark!r}, "
+            f"visual_id={self.visual_id!r}, patched_elements_ids={self.patched_elements_ids!r}, "
+            f"grid={self.grid!r}, steps={self.steps!r}, automatico={self.automatico!r}, "
+            f"group_id={self.group_id!r})"
+        )
+
     def to_dict(self) -> dict:
         return {
             "description": self.description,
@@ -81,6 +90,21 @@ class Group:
             "automatico": self.automatico,
             "group_id": self.group_id,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Group":
+        if data is None:
+            return None
+        return cls(
+            patched_elements_ids=data.get("patched_elements_ids"),
+            description=data.get("description"),
+            color_mark=data.get("color_mark"),
+            visual_id=data.get("visual_id"),
+            grid={int(k): v for k, v in data.get("grid", {}).items()},
+            steps={int(k): v for k, v in data.get("steps", {}).items()},
+            automatico=data.get("automatico"),
+            group_id=data.get("group_id"),
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of Group object {self.description} (id: {self.group_id})")

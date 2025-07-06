@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, Any, Optional, Union
 from pathlib import Path
 from datetime import datetime
@@ -18,66 +19,66 @@ from lightshark_parser.classes.general import General
 class Lightshow:
     def __init__(
         self,
-        filepath: str = None,
+        # filepath: str = None,
         fileinfo: FileInfo = None,
-        models: Dict[Any, Model] = None,
-        patches: Dict[Any, Patch] = None,
-        groups: Dict[Any, Group] = None,
-        user_palettes: Dict[Any, UserPalette] = None,
-        cues: Dict[Any, Cue] = None,
-        cuelists: Dict[Any, Cuelist] = None,
-        playbacks: Dict[Any, Playback] = None,
-        fxpalettes: Dict[Any, FXPalette] = None,
+        models: Dict[int, Model] = None,
+        patches: Dict[int, Patch] = None,
+        groups: Dict[int, Group] = None,
+        user_palettes: Dict[int, UserPalette] = None,
+        cues: Dict[int, Cue] = None,
+        cuelists: Dict[int, Cuelist] = None,
+        playbacks: Dict[str, Playback] = None,
+        fxpalettes: Dict[int, FXPalette] = None,
         general: General = None,
     ):  
-        if filepath is not None:
-            self._filepath = Path(filepath)
-            if not self._filepath.exists():
-                raise FileNotFoundError(f"File {filepath} does not exist")
-            self._filename = self._filepath.name
-            stats = self._filepath.stat()
-            created_at = datetime.fromtimestamp(stats.st_ctime)
-            modified_at = datetime.fromtimestamp(stats.st_mtime)
-            self._created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
-            self._modified_at = modified_at.strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            self._filepath = None
-            self._filename = None
-            self._created_at = None
-            self._modified_at = None
+        # if filepath is not None:
+        #     self._filepath = Path(filepath)
+        #     if not self._filepath.exists():
+        #         raise FileNotFoundError(f"File {filepath} does not exist")
+        #     self._filename = self._filepath.name
+        #     stats = self._filepath.stat()
+        #     created_at = datetime.fromtimestamp(stats.st_ctime)
+        #     modified_at = datetime.fromtimestamp(stats.st_mtime)
+        #     self._created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
+        #     self._modified_at = modified_at.strftime("%Y-%m-%d %H:%M:%S")
+        # else:
+        #     self._filepath = None
+        #     self._filename = None
+        #     self._created_at = None
+        #     self._modified_at = None
 
         self._parsed_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._fileinfo: FileInfo = fileinfo
-        self._models: Dict[Any, Model] = models
-        self._patches: Dict[Any, Patch] = patches
-        self._groups: Dict[Any, Group] = groups
-        self._user_palettes: Dict[Any, UserPalette] = user_palettes
-        self._cues: Dict[Any, Cue] = cues
-        self._cuelists: Dict[Any, Cuelist] = cuelists
-        self._playbacks: Dict[Any, Playback] = playbacks
-        self._fxpalettes: Dict[Any, FXPalette] = fxpalettes
+        self._models: Dict[int, Model] = models
+        self._patches: Dict[int, Patch] = patches
+        self._groups: Dict[int, Group] = groups
+        self._user_palettes: Dict[int, UserPalette] = user_palettes
+        self._cues: Dict[int, Cue] = cues
+        self._cuelists: Dict[int, Cuelist] = cuelists
+        self._playbacks: Dict[str, Playback] = playbacks
+        self._fxpalettes: Dict[int, FXPalette] = fxpalettes
         self._general: General = general
 
     # Getters and setters
-    @property
-    def filepath(self) -> Path:
-        return self._filepath
+    # @property
+    # def filepath(self) -> Path:
+    #     return self._filepath
         
-    @property
-    def filename(self) -> str:
-        return self._filename
+    # @property
+    # def filename(self) -> str:
+    #     return self._filename
         
-    @property
-    def parsed_date(self) -> str:
-        return self._parsed_date
+    # @property
+    # def parsed_date(self) -> str:
+    #     return self._parsed_date
         
-    @property
-    def created_at(self) -> str:
-        return self._created_at
+    # @property
+    # def created_at(self) -> str:
+    #     return self._created_at
         
-    @property
-    def modified_at(self) -> str:
-        return self._modified_at
+    # @property
+    # def modified_at(self) -> str:
+    #     return self._modified_at
 
     # Property getters for section attributes
     @property
@@ -191,6 +192,17 @@ class Lightshow:
     def general(self, value: General) -> None:
         self._general = value
 
+
+    def __repr__(self):
+        return (
+            f"Lightshow(fileinfo={self._fileinfo!r}, models={self._models!r}, "
+            f"patches={self._patches!r}, groups={self._groups!r}, "
+            f"user_palettes={self._user_palettes!r}, cues={self._cues!r}, "
+            f"cuelists={self._cuelists!r}, playbacks={self._playbacks!r}, "
+            f"fxpalettes={self._fxpalettes!r}, general={self._general!r})"
+        )
+
+
     def to_dict(self) -> Dict:
         def to_dict_recursive(obj):
             if hasattr(obj, "to_dict") and callable(getattr(obj, "to_dict")):
@@ -204,6 +216,11 @@ class Lightshow:
             return obj
 
         return {
+            # "filepath": str(self._filepath) if self._filepath else None,
+            # "filename": self._filename,
+            # "parsed_date": self._parsed_date,
+            # "created_at": self._created_at,
+            # "modified_at": self._modified_at,
             "fileinfo": to_dict_recursive(self._fileinfo),
             "models": {str(k): to_dict_recursive(v) for k, v in self._models.items()} if self._models else {},
             "patches": {str(k): to_dict_recursive(v) for k, v in self._patches.items()} if self._patches else {},
@@ -216,11 +233,48 @@ class Lightshow:
             "general": to_dict_recursive(self._general),
         }
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Lightshow":
+        fileinfo = FileInfo.from_dict(data.get("fileinfo"))
+        models = {int(k): Model.from_dict(v) for k, v in data.get("models", {}).items()}
+        patches = {int(k): Patch.from_dict(v) for k, v in data.get("patches", {}).items()}
+        groups = {int(k): Group.from_dict(v) for k, v in data.get("groups", {}).items()}
+        user_palettes = {int(k): UserPalette.from_dict(v) for k, v in data.get("user_palettes", {}).items()}
+        cues = {int(k): Cue.from_dict(v) for k, v in data.get("cues", {}).items()}
+        cuelists = {int(k): Cuelist.from_dict(v) for k, v in data.get("cuelists", {}).items()}
+        playbacks = {str(k): Playback.from_dict(v) for k, v in data.get("playbacks", {}).items()}
+        fxpalettes = {int(k): FXPalette.from_dict(v) for k, v in data.get("fxpalettes", {}).items()}
+        general = General.from_dict(data.get("general"))
+        return cls(
+            fileinfo=fileinfo,
+            models=models,
+            patches=patches,
+            groups=groups,
+            user_palettes=user_palettes,
+            cues=cues,
+            cuelists=cuelists,
+            playbacks=playbacks,
+            fxpalettes=fxpalettes,
+            general=general,
+        )
+
     def summarise(self):
         from lightshark_parser.summariser import format_lightshow
         return format_lightshow(self)
+    
+    def save_lightshow(self, filepath: Union[str, Path]) -> None:
+        if isinstance(filepath, str):
+            filepath = Path(filepath)
+        if not filepath.suffix == ".lshw":
+            raise ValueError("Filepath must have .lshw extension")
+        
+        logging.debug(f"Saving Lightshow to {filepath}")
+        with open(filepath, "wb") as f:
+            f.write(self.to_bytes())
+        logging.info(f"Lightshow saved to {filepath}")
 
-    def to_bytes(self, filepath: Optional[Union[str, Path]] = None) -> bytes:
+
+    def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of Lightshow object")
         bytestr = bytearray()
         if self._fileinfo is not None:
@@ -270,14 +324,6 @@ class Lightshow:
         bytestr.extend(serialise_section_header("#end#"))
         
         result = bytes(bytestr)
-        
-        # If filepath is provided, write the bytes to the file
-        if filepath is not None:
-            filepath = Path(filepath)
-            filepath.parent.mkdir(parents=True, exist_ok=True)
-            with open(filepath, 'wb') as f:
-                f.write(result)
-            logging.info(f"Lightshow saved to {filepath}")
         
         return result
 

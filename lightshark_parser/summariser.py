@@ -17,10 +17,6 @@ def format_lightshow(lightshow: Lightshow) -> str:
 def format_show_info(lightshow: Lightshow) -> str:
     return f"""========== SHOW INFO ==========
 
-File name: {lightshow.filename}
-Date parsed: {lightshow.parsed_date}
-Creation Date: {lightshow.created_at}
-Last Modified: {lightshow.modified_at}
 
 Fixtures: {len(lightshow.patches) if lightshow.patches else 0}
 Cues: {len(lightshow.cues) if lightshow.cues else 0}

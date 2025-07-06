@@ -12,8 +12,8 @@ from lightshark_parser.parsers.attribute_parsers import (
 )
 from lightshark_parser.utils.custom_errors import MarkerNotFoundError
 from lightshark_parser.classes import (
-    FileInfo, Model, ModelPalette, ModelHardware, ModelValue, ModelValueStep, Macro, MacroStep, Patch, Group, UserPalette, Cue, Order, FX, FXLayer, FXLayerStep, FXPalette,
-    Cuelist, CuelistElement, Playback, General, Action
+    Version, FileInfo, Model, ModelPalette, ModelHardware, ModelValue, ModelValueStep, Macro, MacroStep, Patch, Group, UserPalette, Cue, Order, FX, FXLayer, FXLayerStep, FXPalette,
+    Cuelist, CuelistElement, Playback, Config, General, Action
 )
 
 
@@ -38,7 +38,7 @@ def _init_object_reading(file_bytes: bytes, ptr: int) -> tuple[int, int, int, in
 
 #### FILEINFO ####
 
-def read_version(file_bytes: bytes, ptr: int) -> tuple[FileInfo.Version, int]:
+def read_version(file_bytes: bytes, ptr: int) -> tuple[Version, int]:
     version = {}
     if file_bytes[ptr : ptr + 12] != b"\x00\x00\x00\x08\xa7version":
         raise MarkerNotFoundError("Could not find version marker in file")
@@ -68,7 +68,7 @@ def read_version(file_bytes: bytes, ptr: int) -> tuple[FileInfo.Version, int]:
         num_attr += 1
 
     _obj_checker(initial_ptr, ptr, version_bytelength, num_attr, num_attr_indicated)
-    return FileInfo.Version(**version), ptr
+    return Version(**version), ptr
 
 
 def read_fileinfo(file_bytes: bytes, ptr: int) -> tuple[FileInfo, int]:
@@ -987,7 +987,7 @@ def read_playback(file_bytes: bytes, ptr: int) -> tuple[Playback, int]:
     return Playback(**playback), ptr
 
 
-def read_config(file_bytes: bytes, ptr: int) -> tuple[General.Config, int]:
+def read_config(file_bytes: bytes, ptr: int) -> tuple[Config, int]:
     config = {}
     if file_bytes[ptr : ptr + 11] != b"\x00\x00\x00\x07\xa6config":
         raise MarkerNotFoundError("Could not find config marker in file")
@@ -1026,7 +1026,7 @@ def read_config(file_bytes: bytes, ptr: int) -> tuple[General.Config, int]:
         num_attr += 1
 
     _obj_checker(initial_ptr, ptr, config_bytelength, num_attr, num_attr_indicated)
-    return General.Config(**config), ptr
+    return Config(**config), ptr
 
 
 def read_general(file_bytes: bytes, ptr: int) -> tuple[General, int]:
@@ -1037,7 +1037,7 @@ def read_general(file_bytes: bytes, ptr: int) -> tuple[General, int]:
     return General(**general), ptr
 
 
-def read_fxpalette(file_bytes: bytes, ptr: int) -> tuple[dict, int]:
+def read_fxpalette(file_bytes: bytes, ptr: int) -> tuple[FXPalette, int]:
     fxpalette = {}
     fxpalette_bytelength, initial_ptr, num_attr_indicated, ptr = _init_object_reading(file_bytes, ptr)
     attributes = ["fx_palette", "cue_id", "visual_id", "fxs", "fxs_channels", "orders", "name"]

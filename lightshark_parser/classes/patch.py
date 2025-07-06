@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
@@ -41,6 +42,17 @@ class Patch:
         self.size: Optional[int] = size
         self.frozen: Optional[int] = frozen
 
+    def __repr__(self):
+        return (
+            f"Patch(model_id={self.model_id!r}, inverse_tilt={self.inverse_tilt!r}, "
+            f"name={self.name!r}, channels_ftype={self.channels_ftype!r}, "
+            f"index={self.index!r}, universe={self.universe!r}, "
+            f"description={self.description!r}, inverse_pan={self.inverse_pan!r}, "
+            f"visual_id={self.visual_id!r}, parked={self.parked!r}, "
+            f"color_mark={self.color_mark!r}, dimmer={self.dimmer!r}, "
+            f"swap_pan_tilt={self.swap_pan_tilt!r}, virtual_dimmer={self.virtual_dimmer!r}, "
+            f"id={self.id!r}, size={self.size!r}, frozen={self.frozen!r})"
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -62,6 +74,30 @@ class Patch:
             "size": self.size,
             "frozen": self.frozen,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Patch":
+        if data is None:
+            return None
+        return cls(
+            model_id=data.get("model_id"),
+            inverse_tilt=data.get("inverse_tilt"),
+            name=data.get("name"),
+            channels_ftype=data.get("channels_ftype"),
+            index=data.get("index"),
+            universe=data.get("universe"),
+            description=data.get("description"),
+            inverse_pan=data.get("inverse_pan"),
+            visual_id=data.get("visual_id"),
+            parked=data.get("parked"),
+            color_mark=data.get("color_mark"),
+            dimmer=data.get("dimmer"),
+            swap_pan_tilt=data.get("swap_pan_tilt"),
+            virtual_dimmer=data.get("virtual_dimmer"),
+            id=data.get("id"),
+            size=data.get("size"),
+            frozen=data.get("frozen"),
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of Patch object {self.name} (ID: {self.id})")

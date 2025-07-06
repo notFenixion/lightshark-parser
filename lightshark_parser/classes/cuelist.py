@@ -60,6 +60,22 @@ class Cuelist:
         self.ms_flash_hold: Optional[int] = ms_flash_hold
         self.ms_stop_time: Optional[int] = ms_stop_time
 
+    def __repr__(self):
+        return (
+            f"Cuelist(ms_flash_attack={self.ms_flash_attack!r}, autoreset={self.autoreset!r}, "
+            f"at_end_pause={self.at_end_pause!r}, loops={self.loops!r}, chase={self.chase!r}, "
+            f"ms_chase_time={self.ms_chase_time!r}, visual_id={self.visual_id!r}, "
+            f"bpm_chase={self.bpm_chase!r}, ms_flash_decay={self.ms_flash_decay!r}, "
+            f"pcrossfade={self.pcrossfade!r}, ms_fadeout={self.ms_fadeout!r}, "
+            f"direction={self.direction!r}, at_end_stop={self.at_end_stop!r}, "
+            f"flash_mode={self.flash_mode!r}, cuelist_id={self.cuelist_id!r}, "
+            f"ms_fadein={self.ms_fadein!r}, ms_crossfade={self.ms_crossfade!r}, "
+            f"no_first_fade={self.no_first_fade!r}, name={self.name!r}, block_fx={self.block_fx!r}, "
+            f"cuelist_elements={self.cuelist_elements!r}, "
+            f"ms_flash_hold={self.ms_flash_hold!r}, ms_stop_time={self.ms_stop_time!r})"
+        )
+
+
     def to_dict(self) -> dict:
         return {
             "ms_flash_attack": self.ms_flash_attack,
@@ -86,6 +102,37 @@ class Cuelist:
             "ms_flash_hold": self.ms_flash_hold,
             "ms_stop_time": self.ms_stop_time,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Cuelist":
+        if data is None:
+            return None
+        cuelist_elements = [CuelistElement.from_dict(elem) for elem in data.get("cuelist_elements", [])]
+        return cls(
+            ms_flash_attack=data.get("ms_flash_attack"),
+            autoreset=data.get("autoreset"),
+            at_end_pause=data.get("at_end_pause"),
+            loops=data.get("loops"),
+            chase=data.get("chase"),
+            ms_chase_time=data.get("ms_chase_time"),
+            visual_id=data.get("visual_id"),
+            bpm_chase=data.get("bpm_chase"),
+            ms_flash_decay=data.get("ms_flash_decay"),
+            pcrossfade=data.get("pcrossfade"),
+            ms_fadeout=data.get("ms_fadeout"),
+            direction=data.get("direction"),
+            at_end_stop=data.get("at_end_stop"),
+            flash_mode=data.get("flash_mode"),
+            cuelist_id=data.get("cuelist_id"),
+            ms_fadein=data.get("ms_fadein"),
+            ms_crossfade=data.get("ms_crossfade"),
+            no_first_fade=data.get("no_first_fade"),
+            name=data.get("name"),
+            block_fx=data.get("block_fx"),
+            cuelist_elements=cuelist_elements,
+            ms_flash_hold=data.get("ms_flash_hold"),
+            ms_stop_time=data.get("ms_stop_time"),
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialisation of Cuelist object {self.name}")
@@ -149,6 +196,15 @@ class CuelistElement:
         self.ms_duration: Optional[int] = ms_duration
         self.halt: Optional[bool] = halt
 
+
+    def __repr__(self):
+        return (
+            f"CuelistElement(ms_fadeout={self.ms_fadeout!r}, cue_id={self.cue_id!r}, "
+            f"ms_delay={self.ms_delay!r}, next={self.next!r}, dotted_id={self.dotted_id!r}, "
+            f"ms_fadein={self.ms_fadein!r}, ms_crossfade={self.ms_crossfade!r}, "
+            f"ms_duration={self.ms_duration!r}, halt={self.halt!r})"
+        )
+
     def to_dict(self) -> dict:
         return {
             "ms_fadeout": self.ms_fadeout,
@@ -161,6 +217,20 @@ class CuelistElement:
             "ms_duration": self.ms_duration,
             "halt": self.halt,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CuelistElement":
+        return cls(
+            ms_fadeout=data.get("ms_fadeout"),
+            cue_id=data.get("cue_id"),
+            ms_delay=data.get("ms_delay"),
+            next=data.get("next"),
+            dotted_id=data.get("dotted_id"),
+            ms_fadein=data.get("ms_fadein"),
+            ms_crossfade=data.get("ms_crossfade"),
+            ms_duration=data.get("ms_duration"),
+            halt=data.get("halt"),
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of CuelistElement object {self.cue_id}")

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
@@ -30,31 +31,21 @@ class Order:
 
         self._validate_init()
 
-
+    def __repr__(self):
+        return (
+            f"Order(palette_id={self.palette_id!r}, universe={self.universe!r}, "
+            f"section={self.section!r}, receptor_type={self.receptor_type!r}, "
+            f"patch_id={self.patch_id!r}, ftype={self.ftype!r}, "
+            f"value={self.value!r}, channel={self.channel!r})"
+        )
 
 
     def _validate_init(self):
         """
         Checks for:
-        - Valid patch_id
-        - Valid ftype (matches the patch's model)
         - Valid value (>= 0 for now)
-
+        - there was more but no more :(
         """
-
-        # patch = Patch.get_patch(self.patch_id)
-        # if patch is None:
-        #     raise ValueError(f"Patch with ID {self.patch_id} not found")
-        # model = Model.get_model(patch.model_id)
-
-        # valid_ftypes = [v.ftype for v in model.values]
-
-        # if self.ftype not in valid_ftypes:
-        #     raise ValueError(
-        #         f"Invalid ftype {self.ftype} detected for the patch indicated.\n"
-        #         f"Valid ftypes are: {valid_ftypes}"
-        #     )
-
         if self.value < 0:
             raise ValueError(f"Invalid value {self.value} detected.\n"
                 f"Value must be >= 0")
@@ -71,6 +62,19 @@ class Order:
             "value": self.value,
             "channel": self.channel,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Order":
+        return cls(
+            palette_id=data.get("palette_id"),
+            universe=data.get("universe"),
+            section=data.get("section"),
+            receptor_type=data.get("receptor_type"),
+            patch_id=data.get("patch_id"),
+            ftype=data.get("ftype"),
+            value=data.get("value"),
+            channel=data.get("channel"),
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of Order object for palette ID: {self.palette_id})")

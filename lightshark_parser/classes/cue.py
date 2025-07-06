@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
@@ -14,25 +15,35 @@ class Cue:
 
     def __init__(
         self,
-        fx_palette: Optional[int] = None,
+        fx_palette: Optional[int|str] = None,
         cue_id: Optional[int] = None,
         description: Optional[str] = None,
         visual_id: Optional[int] = None,
-        fxs: Optional[List["FX"]] = None,
+        fxs: Optional[List["FX"]] = [],
         fxs_channels: Optional[List[Dict[int, Any]]] = None,
         orders: Optional[List[Order]] = None,
         actions: Optional[List["Action"]] = None,
         name: Optional[str] = None,
     ) -> None:
-        self.fx_palette: int = fx_palette
+        self.fx_palette: int|str = fx_palette
         self.cue_id: int = cue_id
         self.description: str = description
         self.visual_id: int = visual_id
-        self.fxs: List["FX"] = fxs
+        self.fxs: List[FX] = fxs
         self.fxs_channels: List[dict] = fxs_channels
         self.orders: List[Order] = orders
-        self.actions: List["Action"] = actions
+        self.actions: List[Action] = actions
         self.name: str = name
+
+
+
+    def __repr__(self):
+        return (
+            f"Cue(fx_palette={self.fx_palette!r}, cue_id={self.cue_id!r}, "
+            f"description={self.description!r}, visual_id={self.visual_id!r}, "
+            f"fxs={self.fxs!r}, fxs_channels={self.fxs_channels!r}, "
+            f"orders={self.orders!r}, actions={self.actions!r}, name={self.name!r})"
+        )
 
     def to_dict(self) -> dict:
         fxs_list = []
@@ -64,6 +75,26 @@ class Cue:
             "orders": orders_list,
             "name": self.name,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Cue":
+        if data is None:
+            return None
+        fxs = [FX.from_dict(fx) for fx in data.get("fxs", [])] if data.get("fxs") else []
+        orders = [Order.from_dict(order) for order in data.get("orders", [])] 
+        actions = [Action.from_dict(action) for action in data.get("actions", [])] if data.get("actions") else None
+        return cls(
+            fx_palette=data.get("fx_palette"),
+            cue_id=data.get("cue_id"),
+            description=data.get("description"),
+            visual_id=data.get("visual_id"),
+            fxs=fxs,
+            fxs_channels=data.get("fxs_channels"),
+            orders=orders,
+            actions=actions,
+            name=data.get("name"),
+        )
+
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of Cue object {self.name} (id: {self.cue_id})")

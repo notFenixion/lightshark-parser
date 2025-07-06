@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
@@ -19,6 +20,12 @@ class UserPalette:
         self.icon: str = icon
         self.orders: List["Order"] = orders
 
+    def __repr__(self):
+        return (
+            f"UserPalette(section={self.section!r}, user_palette_id={self.user_palette_id!r}, "
+            f"name={self.name!r}, icon={self.icon!r}, orders={self.orders!r})"
+        )
+    
     def to_dict(self) -> dict:
         return {
             "section": self.section,
@@ -27,6 +34,19 @@ class UserPalette:
             "icon": self.icon,
             "orders": [order.to_dict() if hasattr(order, "to_dict") else order for order in self.orders],
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "UserPalette":
+        if data is None:
+            return None
+        orders = [Order.from_dict(order) for order in data.get("orders", [])]
+        return cls(
+            section=data.get("section"),
+            user_palette_id=data.get("user_palette_id"),
+            name=data.get("name"),
+            icon=data.get("icon"),
+            orders=orders,
+        )
 
     def to_bytes(self) -> bytes:
         logging.debug(f"Starting serialization of UserPalette object {self.name} (id: {self.user_palette_id})")
