@@ -12,13 +12,21 @@ class UserPalette:
         user_palette_id: int = None,
         name: str = None,
         icon: str = None,
-        orders: Optional[List["Order"]] = None,
+        orders: Optional[dict[int, dict[int, Order]]] = None,
     ) -> None:
+        if orders is not None:
+            for ftype in orders.values():
+                for order in ftype.values():
+                    if order.section != section:
+                        raise ValueError(f"Order section {order.section} does not match UserPalette section {section}")
+
         self.section: int = section
         self.user_palette_id: int = user_palette_id
         self.name: str = name
         self.icon: str = icon
-        self.orders: List["Order"] = orders
+        self.orders: dict[int, dict[int, Order]] = orders
+
+
 
     def __repr__(self):
         return (
@@ -32,14 +40,27 @@ class UserPalette:
             "user_palette_id": self.user_palette_id,
             "name": self.name,
             "icon": self.icon,
-            "orders": [order.to_dict() if hasattr(order, "to_dict") else order for order in self.orders],
+            "orders": {
+                patch_id: {
+                    ftype: order.to_dict()
+                    for ftype, order in ftype_orders.items()
+                }
+                for patch_id, ftype_orders in self.orders.items()
+            },
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "UserPalette":
         if data is None:
             return None
-        orders = [Order.from_dict(order) for order in data.get("orders", [])]
+        orders_data = data.get("orders", {})
+        orders = {
+            int(patch_id): {
+                int(ftype): Order.from_dict(order_data)
+                for ftype, order_data in ftype_orders.items()
+            }
+            for patch_id, ftype_orders in orders_data.items()
+        }
         return cls(
             section=data.get("section"),
             user_palette_id=data.get("user_palette_id"),
@@ -67,10 +88,11 @@ class UserPalette:
                 elif attr_name in string_attrs:
                     content.extend(serialise_str_value(attr_value))
                 elif attr_name == "orders":
-                    num_orders = len(attr_value)
+                    num_orders = sum(len(ftype_orders) for ftype_orders in attr_value.values())
                     content.extend(serialise_objlist_len(num_orders))
-                    for order in attr_value:
-                        content.extend(order.to_bytes())
+                    for ftype_orders in attr_value.values():
+                        for order in ftype_orders.values():
+                            content.extend(order.to_bytes())
 
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))

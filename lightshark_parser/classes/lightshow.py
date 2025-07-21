@@ -1,19 +1,23 @@
 from __future__ import annotations
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 from datetime import datetime
+from lightshark_parser.classes import cuelist
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
+import copy
 from lightshark_parser.classes.fileinfo import FileInfo
 from lightshark_parser.classes.model import Model
 from lightshark_parser.classes.patch import Patch
 from lightshark_parser.classes.group import Group
+from lightshark_parser.classes.order import Order
 from lightshark_parser.classes.user_palette import UserPalette
 from lightshark_parser.classes.cue import Cue
-from lightshark_parser.classes.cuelist import Cuelist
+from lightshark_parser.classes.cuelist import Cuelist, CuelistElement
 from lightshark_parser.classes.playback import Playback
-from lightshark_parser.classes.fx import FXPalette
+from lightshark_parser.classes.fx import FX, FXPalette
 from lightshark_parser.classes.general import General
+from lightshark_parser.utils.json_mappings import get_section_from_ftype
 
 
 class Lightshow:
@@ -193,6 +197,379 @@ class Lightshow:
         self._general = value
 
 
+    ### PATCH / FIXTURE FUNCTIONS ###
+
+    def move_patches(self, patch_ids: list[int], new_visual_id: int) -> None:
+        """
+        Move selected group to new visual IDs, starting with new_visual_id and incrementing by 1 for each group.
+        """
+        visual_ids = [patch.visual_id for patch in self._patches.values()]
+        c = 0
+
+        for patch_id in patch_ids:
+            if patch_id not in self._patches:
+                raise ValueError(f"Patch with ID {patch_id} does not exist")
+            if new_visual_id + c in visual_ids:
+                raise ValueError(f"Visual ID {new_visual_id} already exists for another patch. Cannot move patch {patch_id} to this visual ID.")
+            c += 1
+
+        for patch_id in patch_ids:
+            patch = self._patches[patch_id]
+            patch.visual_id = new_visual_id
+            new_visual_id += 1
+    
+    
+    ### GROUP FUNCTIONS ###
+
+    def add_new_group(self, visual_id: int, patched_elements_ids: list[int]) -> None:
+        """
+        Group implementation already handles the grid, steps, etc. as optional attributes.
+        Only group_id, visual_id, and patched_elements_ids are compulsory.
+        """
+        group_id = max(self._groups.keys(), default=0) + 1
+        if not isinstance(patched_elements_ids, list):
+            raise TypeError("patched_elements_ids must be a list of integers")
+        if not all(isinstance(id, int) for id in patched_elements_ids):
+            raise TypeError("All elements in patched_elements_ids must be integers")
+        self._groups[group_id] = Group(
+            patched_elements_ids=patched_elements_ids,
+            group_id=group_id,
+            visual_id=visual_id,
+        )
+
+    def update_group(self, group_id: int, patched_elements_ids: Optional[list[int]] = None, visual_id: Optional[int] = None) -> None:
+        """
+        Updates an existing group with new patched_elements_ids and/or visual_id.
+        This handles both REC overriding a group and moving a group to a different grid position (diff visual_id).
+        """
+        if group_id not in self._groups:
+            raise ValueError(f"Group with ID {group_id} does not exist")
+        
+        group = self._groups[group_id]
+        
+        if patched_elements_ids is not None:
+            if not isinstance(patched_elements_ids, list):
+                raise TypeError("patched_elements_ids must be a list of integers")
+            if not all(isinstance(id, int) for id in patched_elements_ids):
+                raise TypeError("All elements in patched_elements_ids must be integers")
+            group.patched_elements_ids = patched_elements_ids
+
+            # Set grid and steps to default
+            # NOTE: For future implementation, allow update_group to update grid and steps as well. For now, leave that to the user irl
+            grid = {}
+            for i, fixture_id in enumerate(patched_elements_ids, start=0):
+                grid[fixture_id] = [0, i]
+
+            steps = {}
+            for fixture_id in patched_elements_ids:
+                steps[fixture_id] = 0
+
+        
+        if visual_id is not None:
+            group.visual_id = visual_id
+
+
+    def delete_group(self, group_id: int) -> None:
+        if group_id not in self._groups:
+            raise ValueError(f"Group with ID {group_id} does not exist")
+        del self._groups[group_id]
+
+
+    def copy_group(self, copied_group_id: int, new_visual_id: int) -> None:
+        group = self._groups.get(copied_group_id)
+        if group is None:
+            raise ValueError(f"Group with ID {copied_group_id} does not exist")
+        new_group_id = max(self._groups.keys(), default=0) + 1
+        new_group = copy.deepcopy(group)
+        new_group.group_id = new_group_id
+        new_group.visual_id = new_visual_id
+        self._groups[new_group_id] = new_group
+
+    def move_groups(self, group_ids: list[int], new_visual_id: int) -> None:
+        """
+        Move selected group to new visual IDs, starting with new_visual_id and incrementing by 1 for each group.
+        """
+        visual_ids = [grp.visual_id for grp in self._groups.values()]
+        c = 0
+
+        for group_id in group_ids:
+            if group_id not in self._groups:
+                raise ValueError(f"Group with ID {group_id} does not exist")
+            if new_visual_id + c in visual_ids:
+                raise ValueError(f"Visual ID {new_visual_id} already exists for another group. Cannot move group {group_id} to this visual ID.")
+            c += 1
+
+        for group_id in group_ids:
+            group = self._groups[group_id]
+            group.visual_id = new_visual_id
+            new_visual_id += 1
+    
+    ### ORDER FUNCTIONS ###
+
+    def add_new_order(self, palette_id, patch_id, ftype, value) -> Order:
+        patch = self._patches.get(patch_id)
+        model = self._models.get(patch.model_id)
+        universe = patch.universe
+        if ftype == 516 and model.use_virtual_dimmer:
+            universe = 9
+
+        channel = patch.index
+        for modelvalue in model.values:
+            if modelvalue.ftype == ftype:
+                channel += modelvalue.index
+                break
+
+        return Order(
+            palette_id=palette_id,
+            patch_id=patch_id,
+            ftype=ftype,
+            value=value,
+            universe=universe,
+            section=get_section_from_ftype(ftype),
+            receptor_type=1 if ftype == 516 else 0,
+            channel=channel,
+        )
+
+    ### PALETTE FUNCTIONS ###
+
+    def update_palette_orders(self, palette_id: int, new_orders: dict[int, dict[int, int]]) -> None:
+        """
+        Takes in a dict of {patch_id: {ftype: value}} and updates Orders accordingly.
+        If Order already exists, value is simply updated.
+        If Order does not exist, a new Order is created. For non-specified attributes, the following schema is used to generate the Order:
+        - patch_id: take from dict
+        - channel: patch.index + index of the model.values entry corresponding to the ftype
+        - universe: universe of the patch. For virtual dimmers (ftype=516 + model uses virtual dimmer), universe is set to 9. [NOTE: unconfirmed]
+        - section: ftyped is mapped to a section [NOTE: mapping is not fully complete]
+        - receptor_type: if ftype=516, set to 1 [NOTE: unconfirmed]
+
+        """
+        if not isinstance(new_orders, dict):
+            raise TypeError("new_orders must be a dictionary")
+        
+        palette = self._user_palettes.get(palette_id)
+        if palette is None:
+            raise ValueError(f"Palette with ID {palette_id} does not exist")
+        for patch_id, ftype_orders in new_orders.items():
+            for ftype, value in ftype_orders.items():
+                if ftype not in palette.orders[patch_id]:
+                    # Create a new Order if it doesn't exist
+                    
+
+                    palette.orders[patch_id][ftype] = self.add_new_order(
+                        palette_id=palette_id,
+                        patch_id=patch_id,
+                        ftype=ftype,
+                        value=value
+                    )
+                else:
+                    # Update the existing Order's value
+                    palette.orders[patch_id][ftype].value = value
+        
+
+
+    def add_new_palette(self, orders: dict[int, dict[int, int]]):
+
+        palette_id = max(self._user_palettes.keys(), default=0) + 1
+        palette = UserPalette(
+            user_palette_id=palette_id,
+            name=f"Palette {palette_id}",
+            orders={patch_id: {} for patch_id in orders.keys()},
+        )
+        self._user_palettes[palette_id] = palette
+        self.update_palette_orders(palette_id=palette_id, new_orders=orders)
+        palette.section = palette.orders[next(iter(orders))][next(iter(orders[next(iter(orders))]))].section 
+
+
+    def delete_palette(self, palette_id: int) -> None:
+        if palette_id not in self._user_palettes:
+            raise ValueError(f"Palette with ID {palette_id} does not exist")
+        del self._user_palettes[palette_id]
+
+    ### CUE FUNCTIONS ###
+
+
+    def add_new_cue(self, cuelist_id: int, fx_palette: Union[int, str], orders: dict[int, dict[int, List[int, int]]], fxs: List[FX]=None):
+        """
+        orders is {patch_id: {ftype: [value, palette_id]}}
+        palette_id is optional, set to 0 if None (same as how file stores)
+        if a palette_id is provided, it will use that palette's Order instead. else create new Order     
+
+        i think fx_palette = "N/A" shld be handled alr???
+        """
+        cuelist = self._cuelists.get(cuelist_id)
+        
+        visual_id = max(cuelist.cuelist_elements, key=lambda c: c.dotted_id, default=0)
+        visual_id = ((visual_id // 100) + 1) * 100
+
+        if fxs == [] or fxs == None:
+            fxs_channels = [0 for _ in range(16)]
+        else:
+            # TO BE IMPLEMENTED :(
+            pass
+
+        cue_id = max(self._cues.keys(), default=0) + 1
+
+    
+        for patch_id, ftype_orders in orders.items():
+            for ftype, order_values in ftype_orders.items():
+                value, palette_id = order_values
+                if palette_id == 0:
+                    order_values = self.add_new_order(
+                        palette_id=palette_id,
+                        patch_id=patch_id,
+                        ftype=ftype,
+                        value=value
+                    )
+                else:
+                    order_values = self._user_palettes[palette_id].orders[patch_id][ftype]
+  
+        cue = Cue(
+            cuelist_id=cuelist_id,
+            cue_id=cue_id,
+            visual_id=visual_id,
+            orders=orders,
+            fxs=fxs,
+            fx_palette=fx_palette,
+            fxs_channels=fxs_channels
+        )
+        self._cues[cue_id] = cue
+        self.add_cue_to_cuelist(cue_id)
+
+
+    def delete_cue(self, cuelist_id: int, cue_id: int) -> None:
+        # Deletes the cuelist_elements as well
+        cuelist = self._cuelists.get(cuelist_id)
+        dotted_id = self._cues[cue_id].visual_id
+        if cuelist is None:
+            raise ValueError(f"Cuelist with ID {cuelist_id} does not exist")
+        if dotted_id not in cuelist.cuelist_elements:
+            raise ValueError(f"Cuelist element with dotted_id {dotted_id} does not exist in cuelist {cuelist_id}")
+
+        del cuelist.cuelist_elements[dotted_id]
+        del self._cues[cue_id]
+
+    ### CUELIST FUNCTIONS ###
+
+    def add_new_cuelist(self) -> None:
+
+        cuelist_id = max(self._cuelists.keys(), default=0) + 1
+        visual_id = max((cuelist.visual_id for cuelist in self._cuelists.values()), default=0) + 1
+        # rest of the attributes will use the default init
+        cuelist = Cuelist(
+            cuelist_id=cuelist_id,
+            visual_id=visual_id
+        )
+        self._cuelists[cuelist_id] = cuelist
+        return cuelist
+
+    def add_cue_to_cuelist(self, cue_id: int) -> None:
+        # Doesnt take in a cuelist_id cuz thats alr in the Cue
+        cue = self._cues.get(cue_id)
+        if cue is None:
+            raise ValueError(f"Cue with ID {cue_id} does not exist")
+
+        cuelist_element = CuelistElement(
+            ms_crossfade=0,
+            ms_delay=0,
+            ms_fadein=0,
+            ms_fadeout=0,
+            ms_duration=2000,
+            halt=True,
+            cue_id=cue_id,
+            dotted_id=cue.visual_id,
+            next=None
+        )
+
+        self._cuelists[cue.cuelist_id].cuelist_elements[cue.visual_id] = cuelist_element
+
+    def update_cuelist_element(self,
+        cuelist_id: int,
+        curr_dotted_id: int,
+        updated_values: Dict[str, Any]   
+    ):
+        """
+        - if new_dottedid is taken in cuelist
+            - taken: assign it the next nontaken subcue id
+            - not taken: then just assign directly lol
+        - if next == a dottedid within cuelist's elements
+            - if yes, then assign it
+            - if no, no change occurs
+        - if ms_duration = 0, set halt to true. if not = 0 set halt to false
+        """
+        cuelist = self._cuelists.get(cuelist_id)
+        if cuelist is None:
+            raise ValueError(f"Cuelist with ID {cuelist_id} does not exist")
+        if curr_dotted_id not in cuelist.cuelist_elements:
+            raise ValueError(f"Cuelist element with dotted_id {curr_dotted_id} does not exist in cuelist {cuelist_id}")
+
+        element = cuelist.cuelist_elements[curr_dotted_id]
+        existing_dotted_ids = set(cuelist.cuelist_elements.keys())
+        for key, value in updated_values.items():
+            if hasattr(element, key):
+                if key == 'dotted_id':
+                    if value in existing_dotted_ids:
+                        value = self.find_next_dottedid(value, existing_dotted_ids)
+                    if value != curr_dotted_id:
+                        # Remove element from old key and add to new key
+                        cuelist.cuelist_elements[value] = cuelist.cuelist_elements.pop(curr_dotted_id)
+                        curr_dotted_id = value
+
+                elif key == 'next':
+                    if value not in existing_dotted_ids:
+                        continue
+
+                elif key == 'ms_duration':
+                    element.halt = (value == 0)
+
+                setattr(element, key, value)
+            else:
+                raise ValueError(f"Invalid attribute '{key}' for CuelistElement")
+
+    def find_next_dottedid(value: int, existing_dotted_ids: set) -> int:
+        """
+        Find the next available dotted_id using the specified logic:
+        1. Round up to next multiple of 10 within the same hundred (620, 630, etc.)
+        2. If all multiples of 10 in that hundred are taken, increment by 1 (611, 612, etc.)
+        3. Raise error if no space is available
+        """
+        if value not in existing_dotted_ids:
+            return value
+        
+        # Get the base hundred (610 -> 600, 1250 -> 1200)
+        base_hundred = (value // 100) * 100
+        
+        # Phase 1: Try multiples of 10 within the same hundred
+        # Start from the next multiple of 10 after the current value
+        next_multiple_of_10 = ((value // 10) + 1) * 10
+        
+        for candidate in range(next_multiple_of_10, base_hundred + 100, 10):
+            if candidate not in existing_dotted_ids:
+                return candidate
+        
+        # Phase 2: Try incrementing by 1 from the original value
+        for candidate in range(value + 1, base_hundred + 100):
+            if candidate not in existing_dotted_ids:
+                return candidate
+        
+        # If we reach here, the entire hundred block is full
+        raise ValueError(f"No available dotted_id found in the range {base_hundred}-{base_hundred + 99}. All positions are occupied.")
+
+        
+
+
+    ### PLAYBACK FUNCTIONS ###
+
+    def assign_playback(self, page: int, index: int, cuelist: int):
+        # Assign cuelist to blank playback.
+        # Can't assign to a taken playback cuz that would just record cue to cuelist
+        
+        combined_id = f"{page}.{index}"
+        if combined_id in self._playbacks:
+            raise ValueError(f"Playback with page {page} and index {index} already exists")
+        playback = Playback(page=page, index=index, cuelist=cuelist)
+        self._playbacks[combined_id] = playback
+
     def __repr__(self):
         return (
             f"Lightshow(fileinfo={self._fileinfo!r}, models={self._models!r}, "
@@ -262,6 +639,15 @@ class Lightshow:
         from lightshark_parser.summariser import format_lightshow
         return format_lightshow(self)
     
+    def save_summary(self, filepath: Union[str, Path]) -> None:
+        if isinstance(filepath, str):
+            filepath = Path(filepath)
+        
+        logging.debug(f"Saving Lightshow summary to {filepath}")
+        with open(filepath, "w") as f:
+            f.write(self.summarise())
+        logging.info(f"Lightshow summary saved to {filepath}")
+    
     def save_lightshow(self, filepath: Union[str, Path]) -> None:
         if isinstance(filepath, str):
             filepath = Path(filepath)
@@ -326,38 +712,3 @@ class Lightshow:
         result = bytes(bytestr)
         
         return result
-
-    def add_patch(self, patch: Patch) -> None:
-        if patch.id in self._patches:
-            raise ValueError(f"Duplicate patch ID: {patch.id}")
-        self._patches[patch.id] = patch
-
-    def add_cue(self, cue: Cue) -> None:
-        if cue.cue_id in self._cues:
-            raise ValueError(f"Duplicate cue ID: {cue.cue_id}")
-        self._cues[cue.cue_id] = cue
-
-    def add_model(self, model: Model) -> None:
-        if model.model_id in self._models:
-            raise ValueError(f"Duplicate model ID: {model.model_id}")
-        self._models[model.model_id] = model
-
-    def add_user_palette(self, palette: UserPalette) -> None:
-        if palette.user_palette_id in self._user_palettes:
-            raise ValueError(f"Duplicate user_palette_id: {palette.user_palette_id}")
-        self._user_palettes[palette.user_palette_id] = palette
-
-    def add_cuelist(self, cuelist: Cuelist) -> None:
-        if cuelist.cuelist_id in self._cuelists:
-            raise ValueError(f"Duplicate cuelist ID: {cuelist.cuelist_id}")
-        self._cuelists[cuelist.cuelist_id] = cuelist
-
-    def add_playback(self, playback: Playback) -> None:
-        if playback.combined_id in self._playbacks:
-            raise ValueError(f"Duplicate playback ID: {playback.combined_id}")
-        self._playbacks[playback.combined_id] = playback
-
-    def add_fxpalette(self, fxpalette: FXPalette) -> None:
-        if fxpalette.fx_palette in self._fxpalettes:
-            raise ValueError(f"Duplicate FX palette ID: {fxpalette.fx_palette}")
-        self._fxpalettes[fxpalette.fx_palette] = fxpalette

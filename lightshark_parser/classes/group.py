@@ -7,15 +7,13 @@ import logging
 class Group:
 
     """
-    Compulsory attributes: patched_elements_ids
+    Compulsory attributes: patched_elements_ids, group_id, visual_id
     Optional attributes (defaults): 
         description = "Group {group_id}"
         color_mark = 0
-        visual_id = max(Group._all_visual_ids) + 1
         grid = linear
         steps = 0
         automatico = False
-        group_id = max(Group._all_groups.keys(), default=0) + 1
 
     """
 
@@ -30,8 +28,36 @@ class Group:
         automatico: bool = False,
         group_id: Optional[int] = None,
     ) -> None:
+        self._intialised = False
+        description, grid, steps = Group.group_checker(
+            patched_elements_ids=patched_elements_ids,
+            description=description,
+            grid=grid,
+            steps=steps,
+            group_id=group_id
+        )
 
-        # If description not given, auto-assign to "Group {group_id}"
+
+        self.description = description
+        self.color_mark = color_mark
+        self.visual_id = visual_id
+        self.patched_elements_ids = patched_elements_ids
+        self.grid = grid
+        self.steps = steps
+        self.automatico = automatico
+        self.group_id = group_id
+        self._intialised = True
+
+    @classmethod
+    def group_checker(cls,
+        patched_elements_ids: List[int],
+        description: Optional[str],
+        grid: Optional[Dict[int, List[int]]],
+        steps: Optional[Dict[int, int]],
+        group_id: Optional[int],
+                    
+    ):
+         # If description not given, auto-assign to "Group {group_id}"
         if description is None:
             description = f"Group {group_id}"
 
@@ -43,7 +69,7 @@ class Group:
         else:
             for fixture_id, fixture_pos in grid.items():
                 if fixture_id not in patched_elements_ids:
-                    raise ValueError(f"Fixture ID {fixture_id} not found in patched_elements_ids")
+                    raise ValueError(f"Fixture ID {fixture_id} not found in patched_elements_ids of Group {group_id}")
                 if len(fixture_pos) != 2 or not all(isinstance(x, int) for x in fixture_pos):
                     raise ValueError(f"Fixture position {fixture_pos} must be a list of 2 integers")
                 if list(grid.values()).count(fixture_pos) > 1:
@@ -57,19 +83,27 @@ class Group:
         else:
             for fixture_id, step in steps.items():
                 if fixture_id not in patched_elements_ids:
-                    raise ValueError(f"Fixture ID {fixture_id} not found in patched_elements_ids")
+                    raise ValueError(f"Fixture ID {fixture_id} not found in patched_elements_ids of Group {group_id}")
                 if not isinstance(step, int):
                     raise ValueError(f"Step {step} must be an integer")
+        
+        return description, grid, steps
+
+    def __setattr__(self, name, value):
+        self.__dict__[name] = value
+
+        if self._intialised:
+            Group.group_checker(
+                patched_elements_ids=self.patched_elements_ids,
+                description=self.description,
+                grid=self.grid,
+                steps=self.steps,
+                group_id=self.group_id
+            )
+
+        
 
 
-        self.description = description
-        self.color_mark = color_mark
-        self.visual_id = visual_id
-        self.patched_elements_ids = patched_elements_ids
-        self.grid = grid
-        self.steps = steps
-        self.automatico = automatico
-        self.group_id = group_id
 
     def __repr__(self):
         return (

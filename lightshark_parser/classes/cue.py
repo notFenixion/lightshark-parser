@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
 from lightshark_parser.classes.fx import FX
@@ -20,8 +20,8 @@ class Cue:
         description: Optional[str] = None,
         visual_id: Optional[int] = None,
         fxs: Optional[List["FX"]] = [],
-        fxs_channels: Optional[List[Dict[int, Any]]] = None,
-        orders: Optional[List[Order]] = None,
+        fxs_channels: Optional[List[List[Union[int, str]]]] = None,
+        orders: Optional[dict[int, dict[int, Order]]] = None,
         actions: Optional[List["Action"]] = None,
         name: Optional[str] = None,
     ) -> None:
@@ -31,7 +31,7 @@ class Cue:
         self.visual_id: int = visual_id
         self.fxs: List[FX] = fxs
         self.fxs_channels: List[dict] = fxs_channels
-        self.orders: List[Order] = orders
+        self.orders: dict[int, dict[int, Order]] = orders
         self.actions: List[Action] = actions
         self.name: str = name
 
@@ -55,14 +55,13 @@ class Cue:
             else:
                 fxs_list.append(fx)
 
-        orders_list = []
-        for order in self.orders:
-            if hasattr(order, "to_dict"):
-                orders_list.append(order.to_dict())
-            elif hasattr(order, "__dict__"):
-                orders_list.append(order.__dict__)
-            else:
-                orders_list.append(order)
+        orders_dict = {
+            patch_id: {
+                ftype: order.to_dict() if hasattr(order, "to_dict") else order
+                for ftype, order in ftype_orders.items()
+            }
+            for patch_id, ftype_orders in self.orders.items()
+        }
 
         return {
             "fx_palette": self.fx_palette,
@@ -72,7 +71,7 @@ class Cue:
             "actions": self.actions,
             "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
             "fxs_channels": self.fxs_channels,
-            "orders": orders_list,
+            "orders": orders_dict,
             "name": self.name,
         }
 
@@ -81,7 +80,14 @@ class Cue:
         if data is None:
             return None
         fxs = [FX.from_dict(fx) for fx in data.get("fxs", [])] if data.get("fxs") else []
-        orders = [Order.from_dict(order) for order in data.get("orders", [])] 
+        orders_data = data.get("orders", {})
+        orders = {
+            int(patch_id): {
+                int(ftype): Order.from_dict(order_data)
+                for ftype, order_data in ftype_orders.items()
+            }
+            for patch_id, ftype_orders in orders_data.items()
+        }
         actions = [Action.from_dict(action) for action in data.get("actions", [])] if data.get("actions") else None
         return cls(
             fx_palette=data.get("fx_palette"),
@@ -142,10 +148,11 @@ class Cue:
                     for fx in attr_value:
                         content.extend(fx.to_bytes())
                 elif attr_name == 'orders':
-                    num_orders = len(attr_value)
+                    num_orders = sum(len(ftype_orders) for ftype_orders in attr_value.values())
                     content.extend(serialise_objlist_len(num_orders))
-                    for order in attr_value:
-                        content.extend(order.to_bytes())
+                    for ftype_orders in attr_value.values():
+                        for order in ftype_orders.values():
+                            content.extend(order.to_bytes())
                 elif attr_name == 'actions':
                     raise NotImplementedError("Actions not implemented yet")
                     # num_actions = len(attr_value)

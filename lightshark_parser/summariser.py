@@ -132,16 +132,11 @@ def format_user_palettes(lightshow: Lightshow) -> str:
         output += f"\n    Section: {palette.section}"
         output += f"\n    Values/Orders:"
         
-        # Group orders by patch_id so that we can output multiple attributes for one patch
-        orders_by_patch = {}
-        for order in palette.orders:
-            if order.patch_id not in orders_by_patch:
-                orders_by_patch[order.patch_id] = []
-            orders_by_patch[order.patch_id].append(order)
+        orders_by_patch = palette.orders
         
         # Group patches by their attribute values
         value_groups = {}
-        for patch_id, orders in orders_by_patch.items():
+        for patch_id, ftype_orders in orders_by_patch.items():
             # Get the patch and model once per patch_id
             patch = lightshow._patches.get(patch_id)
             if not patch:
@@ -152,7 +147,7 @@ def format_user_palettes(lightshow: Lightshow) -> str:
                 continue
             
             attributes = []
-            for order in orders:
+            for order in ftype_orders.values():
                 description = "Unknown"
                 for value in model.values:
                     if value.ftype == order.ftype:
@@ -209,6 +204,69 @@ def format_fx_palettes(lightshow: Lightshow) -> str:
     for fx_palette_id, fx_palette in lightshow.fxpalettes.items():
         output += f"\n\n{fx_palette.name} (ID:{fx_palette_id})"
         
+        if fx_palette.orders:
+            output += f"\n    Values/Orders:"
+            
+            orders_by_patch = fx_palette.orders
+            
+            # Group patches by their attribute values
+            value_groups = {}
+            for patch_id, ftype_orders in orders_by_patch.items():
+                # Get the patch and model once per patch_id
+                patch = lightshow._patches.get(patch_id)
+                if not patch:
+                    continue
+                    
+                model = lightshow.models.get(patch.model_id)
+                if not model:
+                    continue
+                
+                attributes = []
+                for order in ftype_orders.values():
+                    description = "Unknown"
+                    for value in model.values:
+                        if value.ftype == order.ftype:
+                            description = value.description
+                            break
+                    attributes.append((description, order.value))
+                
+                attributes_tuple = tuple(sorted(attributes))
+                
+                if attributes_tuple not in value_groups:
+                    value_groups[attributes_tuple] = []
+                value_groups[attributes_tuple].append(patch_id)
+            
+            for attributes, patch_ids in value_groups.items():
+                patch_ids = sorted(patch_ids)
+                
+                if len(patch_ids) > 1:
+                    ranges = []
+                    start = patch_ids[0]
+                    prev = start
+                    
+                    for pid in patch_ids[1:]:
+                        if pid == prev + 1:
+                            prev = pid
+                        else:
+                            ranges.append((start, prev))
+                            start = prev = pid
+                    ranges.append((start, prev))
+                    
+                    range_strs = []
+                    for start, end in ranges:
+                        if start == end:
+                            range_strs.append(str(start))
+                        else:
+                            range_strs.append(f"{start}-{end}")
+                    
+                    patch_str = ", ".join(range_strs)
+                else:
+                    patch_str = str(patch_ids[0])
+                
+                attr_str = " | ".join(f"{desc}: {val}" for desc, val in attributes)
+                
+                output += f"\n        {patch_str} - {attr_str}"
+
         if not fx_palette.fxs:
             output += "\n    No FXs used!"
             continue
@@ -307,13 +365,14 @@ def format_cues(lightshow: Lightshow) -> str:
         palette_orders = {}
         standalone_orders = []
         
-        for order in cue.orders:
-            if order.palette_id != 0:
-                if order.palette_id not in palette_orders:
-                    palette_orders[order.palette_id] = []
-                palette_orders[order.palette_id].append(order)
-            else:
-                standalone_orders.append(order)
+        for patch_id, ftype_orders in cue.orders.items():
+            for ftype, order in ftype_orders.items():
+                if order.palette_id != 0:
+                    if order.palette_id not in palette_orders:
+                        palette_orders[order.palette_id] = []
+                    palette_orders[order.palette_id].append(order)
+                else:
+                    standalone_orders.append(order)
         
         if palette_orders:
             output += "\n        Palette Fixtures:"
@@ -468,8 +527,10 @@ def format_cuelists(lightshow: Lightshow) -> str:
         # Cues
         if cuelist.cuelist_elements:
             output += "\n\n    Cue Order:"
-            dottedids = [element.dotted_id for element in cuelist.cuelist_elements]
-            for element in cuelist.cuelist_elements:
+            dottedids = list(cuelist.cuelist_elements.keys())
+            # Sort by dotted_id for consistent display order
+            for dotted_id in sorted(cuelist.cuelist_elements.keys()):
+                element = cuelist.cuelist_elements[dotted_id]
                 if element.cue_id is None:
                     continue
 

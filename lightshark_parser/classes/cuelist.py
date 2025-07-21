@@ -27,7 +27,7 @@ class Cuelist:
         no_first_fade: Optional[bool] = False,
         name: Optional[str] = None,
         block_fx: Optional[bool] = False,
-        cuelist_elements: Optional[List[CuelistElement]] = [],
+        cuelist_elements: Optional[Dict[int, CuelistElement]] = {},
         ms_flash_hold: Optional[int] = 2000,
         ms_stop_time: Optional[int] = 2000,
     ) -> None:
@@ -56,7 +56,7 @@ class Cuelist:
         self.no_first_fade: Optional[bool] = no_first_fade
         self.name: Optional[str] = name
         self.block_fx: Optional[bool] = block_fx
-        self.cuelist_elements: List[CuelistElement] = cuelist_elements
+        self.cuelist_elements: Dict[int, CuelistElement] = cuelist_elements
         self.ms_flash_hold: Optional[int] = ms_flash_hold
         self.ms_stop_time: Optional[int] = ms_stop_time
 
@@ -98,7 +98,7 @@ class Cuelist:
             "no_first_fade": self.no_first_fade,
             "name": self.name,
             "block_fx": self.block_fx,
-            "cuelist_elements": [elem.to_dict() for elem in self.cuelist_elements],
+            "cuelist_elements": {dotted_id: elem.to_dict() for dotted_id, elem in self.cuelist_elements.items()},
             "ms_flash_hold": self.ms_flash_hold,
             "ms_stop_time": self.ms_stop_time,
         }
@@ -107,7 +107,7 @@ class Cuelist:
     def from_dict(cls, data: Dict[str, Any]) -> "Cuelist":
         if data is None:
             return None
-        cuelist_elements = [CuelistElement.from_dict(elem) for elem in data.get("cuelist_elements", [])]
+        cuelist_elements = {int(dotted_id): CuelistElement.from_dict(elem) for dotted_id, elem in data.get("cuelist_elements", {}).items()}
         return cls(
             ms_flash_attack=data.get("ms_flash_attack"),
             autoreset=data.get("autoreset"),
@@ -162,7 +162,9 @@ class Cuelist:
                     num_elements = len(attr_value) if attr_value else 0
                     content.extend(serialise_objlist_len(num_elements))
                     if attr_value:  # Only process if there are elements
-                        for element in attr_value:
+                        # Sort by dotted_id to maintain consistent order
+                        for dotted_id in sorted(attr_value.keys()):
+                            element = attr_value[dotted_id]
                             content.extend(element.to_bytes())
 
         content[0:0] = serialise_num_attr(num_attr)
@@ -180,7 +182,7 @@ class CuelistElement:
         cue_id: Optional[int] = None,
         ms_delay: Optional[int] = None,
         next: Optional[int] = None,
-        dotted_id: Optional[str] = None,
+        dotted_id: Optional[int] = None,
         ms_fadein: Optional[int] = None,
         ms_crossfade: Optional[int] = None,
         ms_duration: Optional[int] = None,
@@ -190,7 +192,7 @@ class CuelistElement:
         self.cue_id: Optional[int] = cue_id
         self.ms_delay: Optional[int] = ms_delay
         self.next: Optional[int] = next
-        self.dotted_id: Optional[str] = dotted_id
+        self.dotted_id: Optional[int] = dotted_id
         self.ms_fadein: Optional[int] = ms_fadein
         self.ms_crossfade: Optional[int] = ms_crossfade
         self.ms_duration: Optional[int] = ms_duration
