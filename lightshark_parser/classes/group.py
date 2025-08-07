@@ -28,8 +28,8 @@ class Group:
         automatico: bool = False,
         group_id: Optional[int] = None,
     ) -> None:
-        self._intialised = False
-        description, grid, steps = Group.group_checker(
+        self._initialised = False
+        description, grid, steps = Group.attr_checker(
             patched_elements_ids=patched_elements_ids,
             description=description,
             grid=grid,
@@ -46,10 +46,10 @@ class Group:
         self.steps = steps
         self.automatico = automatico
         self.group_id = group_id
-        self._intialised = True
+        self._initialised = True
 
     @classmethod
-    def group_checker(cls,
+    def attr_checker(cls,
         patched_elements_ids: List[int],
         description: Optional[str],
         grid: Optional[Dict[int, List[int]]],
@@ -92,8 +92,8 @@ class Group:
     def __setattr__(self, name, value):
         self.__dict__[name] = value
 
-        if self._intialised:
-            Group.group_checker(
+        if self._initialised:
+            Group.attr_checker(
                 patched_elements_ids=self.patched_elements_ids,
                 description=self.description,
                 grid=self.grid,
@@ -152,7 +152,7 @@ class Group:
         num_list_attrs = ["patched_elements_ids"]
         
         for attr_name, attr_value in self.__dict__.items():
-            if attr_value is not None:
+            if attr_name != "_initialised" and attr_value is not None:
                 content.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 

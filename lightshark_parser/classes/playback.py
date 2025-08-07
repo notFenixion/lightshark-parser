@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
 
@@ -57,7 +57,7 @@ class Playback:
         self.ms_crossfade: int = ms_crossfade
         self.on_page_play: bool = on_page_play
         self.xct_color: List[int] = xct_color if xct_color is not None else []
-        self.cuelist: int = cuelist
+        self.cuelist: Union[int, str] = cuelist
         self.xct_push_mode: List[bool] = xct_push_mode if xct_push_mode is not None else []
         self.docked: bool = docked
         self.used_in_alarm: Optional[bool] = used_in_alarm
@@ -165,7 +165,7 @@ class Playback:
         
         num_attrs = [
             "fader_value", "fader_mode", "index", "ms_chase_time", "priority", "bpm_chase", "trigger_level", "pcrossfade", "ms_fadeout", "ms_fadein",
-            "ms_crossfade", "cuelist", "page"
+            "ms_crossfade", "page"
         ]
         bool_attrs = [
             "on_load_play", "chase", "fader_up_play", "on_page_stop", "is_executor", "fader_down_stop", "ignore_swap",
@@ -179,7 +179,13 @@ class Playback:
                 content.extend(serialise_attr_name(attr_name))
                 num_attr += 1
 
-                if attr_name in num_attrs:
+                if attr_name == "cuelist":
+                    if attr_value == "Next":
+                        content.extend(b'\xFF')
+                    else:
+                        content.extend(serialise_num_value(attr_value, cc_check=True))
+
+                elif attr_name in num_attrs:
                     content.extend(serialise_num_value(attr_value, cc_check=True))
                 elif attr_name in bool_attrs:
                     content.extend(serialise_bool_value(attr_value))

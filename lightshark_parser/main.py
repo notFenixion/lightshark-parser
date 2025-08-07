@@ -76,6 +76,8 @@ def main():
 
             if not args.output and not args.verbose:
                 print(f"No output file specified. Output saved to: {output_file}")
+            else:
+                print(f"Output saved to: {output_file}")
 
         elif args.summarise:
             output_file = args.output or f"{os.path.splitext(args.input_file)[0]}_summary.txt"

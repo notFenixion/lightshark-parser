@@ -315,17 +315,17 @@ This document provides a comprehensive overview of all classes in the LightShark
 **File:** `cuelist.py`  
 **Type:** Regular class
 
-| Attribute      | Type             | Default | Description            |
-| -------------- | ---------------- | ------- | ---------------------- |
-| `ms_fadeout`   | `Optional[int]`  | `None`  | Fade out time (ms)     |
-| `cue_id`       | `Optional[int]`  | `None`  | Reference to cue       |
-| `ms_delay`     | `Optional[int]`  | `None`  | Delay time (ms)        |
-| `next`         | `Optional[int]`  | `None`  | Next element reference |
-| `dotted_id`    | `Optional[int]`  | `None`  | Dotted identifier      |
-| `ms_fadein`    | `Optional[int]`  | `None`  | Fade in time (ms)      |
-| `ms_crossfade` | `Optional[int]`  | `None`  | Crossfade time (ms)    |
-| `ms_duration`  | `Optional[int]`  | `None`  | Duration time (ms)     |
-| `halt`         | `Optional[bool]` | `None`  | Halt flag              |
+| Attribute      | Type                        | Default  | Description                                  |
+| -------------- | --------------------------- | -------- | -------------------------------------------- |
+| `ms_fadeout`   | `Optional[int]`             | `None`   | Fade out time (ms)                           |
+| `cue_id`       | `Optional[int]`             | `None`   | Reference to cue                             |
+| `ms_delay`     | `Optional[int]`             | `None`   | Delay time (ms)                              |
+| `next`         | `Optional[Union[int, str]]` | `"Next"` | Next element reference (dotted_id or "Next") |
+| `dotted_id`    | `Optional[int]`             | `None`   | Dotted identifier                            |
+| `ms_fadein`    | `Optional[int]`             | `None`   | Fade in time (ms)                            |
+| `ms_crossfade` | `Optional[int]`             | `None`   | Crossfade time (ms)                          |
+| `ms_duration`  | `Optional[int]`             | `None`   | Duration time (ms)                           |
+| `halt`         | `Optional[bool]`            | `None`   | Halt flag                                    |
 
 ---
 

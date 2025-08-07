@@ -544,7 +544,7 @@ def format_cuelists(lightshow: Lightshow) -> str:
                 fade_in = f"{element.ms_fadein}ms" 
                 fade_out = f"{element.ms_fadeout}ms"
                 
-                next_cue = str(element.next) if (element.next != 255) and (255 not in dottedids) else "Next"
+                next_cue = str(element.next) if isinstance(element.next, int) and element.next in dottedids else "Next"
                 
                 # Format dotted_id with last 2 digits as decimal part
                 formatted_dotted_id = ""

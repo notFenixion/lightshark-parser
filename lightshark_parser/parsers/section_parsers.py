@@ -802,7 +802,7 @@ def read_cuelist_element(file_bytes: bytes, ptr: int) -> tuple[CuelistElement, i
 
         if attr_name == "next":
             if file_bytes[ptr] == 0xFF:
-                element[attr_name] = "N/A"
+                element[attr_name] = "Next"
                 ptr += 1
             else:
                 ptr = _read_number_attribute(file_bytes, ptr, element, attr_name)
@@ -957,7 +957,13 @@ def read_playback(file_bytes: bytes, ptr: int) -> tuple[Playback, int]:
         attr_name, ptr = _read_attribute_name(file_bytes, ptr, attributes, "playback", playback)
 
         # Handle different attribute types
-        if attr_name in ["fader_value", "index", "priority", "trigger_level", "cuelist", "page"]:
+        if attr_name == "cuelist":
+            if file_bytes[ptr] == 0xFF:
+                playback[attr_name] = "Next"
+                ptr += 1
+            else:
+                ptr = _read_number_attribute(file_bytes, ptr, playback, attr_name)
+        elif attr_name in ["fader_value", "index", "priority", "trigger_level", "page"]:
             ptr = _read_number_attribute(file_bytes, ptr, playback, attr_name)
         elif attr_name in [
             "fader_mode",

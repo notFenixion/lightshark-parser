@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from lightshark_parser.serialisers.attribute_serialisers import *
 import logging
 
@@ -181,7 +181,7 @@ class CuelistElement:
         ms_fadeout: Optional[int] = None,
         cue_id: Optional[int] = None,
         ms_delay: Optional[int] = None,
-        next: Optional[int] = None,
+        next: Optional[Union[int, str]] = "Next",
         dotted_id: Optional[int] = None,
         ms_fadein: Optional[int] = None,
         ms_crossfade: Optional[int] = None,
@@ -191,7 +191,7 @@ class CuelistElement:
         self.ms_fadeout: Optional[int] = ms_fadeout
         self.cue_id: Optional[int] = cue_id
         self.ms_delay: Optional[int] = ms_delay
-        self.next: Optional[int] = next
+        self.next: Optional[Union[int, str]] = next
         self.dotted_id: Optional[int] = dotted_id
         self.ms_fadein: Optional[int] = ms_fadein
         self.ms_crossfade: Optional[int] = ms_crossfade
@@ -222,11 +222,16 @@ class CuelistElement:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CuelistElement":
+        # Handle migration from "N/A" to "Next"
+        next_value = data.get("next")
+        if next_value == "N/A":
+            next_value = "Next"
+        
         return cls(
             ms_fadeout=data.get("ms_fadeout"),
             cue_id=data.get("cue_id"),
             ms_delay=data.get("ms_delay"),
-            next=data.get("next"),
+            next=next_value,
             dotted_id=data.get("dotted_id"),
             ms_fadein=data.get("ms_fadein"),
             ms_crossfade=data.get("ms_crossfade"),
@@ -251,7 +256,7 @@ class CuelistElement:
                 num_attr += 1
                 
                 if attr_name == "next":
-                    if attr_value == "N/A":
+                    if attr_value == "Next" or attr_value == "N/A":
                         bytestr.extend(b'\xFF')
                     else:
                         bytestr.extend(serialise_num_value(attr_value, cc_check=True))

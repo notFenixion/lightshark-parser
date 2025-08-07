@@ -374,7 +374,7 @@ class Lightshow:
         palette = UserPalette(
             user_palette_id=palette_id,
             name=f"Palette {palette_id}",
-            orders={patch_id: {} for patch_id in orders.keys()},
+            orders={patch_id: {} for patch_id in orders.keys()} if orders else {},
         )
         self._user_palettes[palette_id] = palette
         self.update_palette_orders(palette_id=palette_id, new_orders=orders)
@@ -389,13 +389,15 @@ class Lightshow:
     ### CUE FUNCTIONS ###
 
 
-    def add_new_cue(self, cuelist_id: int, fx_palette: Union[int, str], orders: dict[int, dict[int, List[int, int]]], fxs: List[FX]=None):
+    def add_new_cue(self, cuelist_id: int, orders: dict[int, dict[int, List[int, int]]], fxs: List[FX]=None, fx_palette: Union[int, str] = "N/A"):
         """
         orders is {patch_id: {ftype: [value, palette_id]}}
         palette_id is optional, set to 0 if None (same as how file stores)
         if a palette_id is provided, it will use that palette's Order instead. else create new Order     
 
         i think fx_palette = "N/A" shld be handled alr???
+
+        NOTE: THIS ALSO RUNS add_cue_to_cuelist, so it will automatically add the cue to the cuelist on init.
         """
         cuelist = self._cuelists.get(cuelist_id)
         
@@ -434,7 +436,25 @@ class Lightshow:
             fxs_channels=fxs_channels
         )
         self._cues[cue_id] = cue
-        self.add_cue_to_cuelist(cue_id)
+        self._add_cue_to_cuelist(cue_id)
+
+
+    def update_cue(self, cue_id: int, updated_values: Dict[str, Any]) -> None:
+        """
+        Ignore FX for now, will be implemented later
+        Updatable values:
+        - fxs, fx_palette, fxs_channels, orders, description, name
+        """
+        cue = self._cues.get(cue_id)
+        if cue is None:
+            raise ValueError(f"Cue with ID {cue_id} does not exist")
+
+        for key, value in updated_values.items():
+            if hasattr(cue, key) and key in ['fxs', 'fx_palette', 'fxs_channels', 'orders', 'description', 'name']:
+                setattr(cue, key, value)
+            else:
+                raise ValueError(f"Invalid attribute '{key}' for Cue")
+
 
 
     def delete_cue(self, cuelist_id: int, cue_id: int) -> None:
@@ -463,7 +483,7 @@ class Lightshow:
         self._cuelists[cuelist_id] = cuelist
         return cuelist
 
-    def add_cue_to_cuelist(self, cue_id: int) -> None:
+    def _add_cue_to_cuelist(self, cue_id: int) -> None:
         # Doesnt take in a cuelist_id cuz thats alr in the Cue
         cue = self._cues.get(cue_id)
         if cue is None:
@@ -478,7 +498,7 @@ class Lightshow:
             halt=True,
             cue_id=cue_id,
             dotted_id=cue.visual_id,
-            next=None
+            next="Next"
         )
 
         self._cuelists[cue.cuelist_id].cuelist_elements[cue.visual_id] = cuelist_element
@@ -492,6 +512,7 @@ class Lightshow:
         - if new_dottedid is taken in cuelist
             - taken: assign it the next nontaken subcue id
             - not taken: then just assign directly lol
+            Cue's visual_id is also updated to match the new dotted_id
         - if next == a dottedid within cuelist's elements
             - if yes, then assign it
             - if no, no change occurs
@@ -505,28 +526,65 @@ class Lightshow:
 
         element = cuelist.cuelist_elements[curr_dotted_id]
         existing_dotted_ids = set(cuelist.cuelist_elements.keys())
+        
         for key, value in updated_values.items():
             if hasattr(element, key):
                 if key == 'dotted_id':
+                    # Ignore dotted_id values <= 100 cuz IDs start from 1.00
+                    if value <= 100:
+                        continue
                     if value in existing_dotted_ids:
-                        value = self.find_next_dottedid(value, existing_dotted_ids)
+                        logging.debug(f"Dotted ID {value} already exists in cuelist {cuelist_id}. Finding next available dotted_id.")
+                        value = self._find_next_dottedid(value, existing_dotted_ids)
+                    
+                    # Update the dotted_id on the element object
+                    setattr(element, key, value)
+                    
+                    # If dotted_id actually changed, update the dictionary key
                     if value != curr_dotted_id:
-                        # Remove element from old key and add to new key
                         cuelist.cuelist_elements[value] = cuelist.cuelist_elements.pop(curr_dotted_id)
-                        curr_dotted_id = value
+                        
+                        # Update visual_id of the cue as well
+                        cue = self._cues[element.cue_id]
+                        cue.visual_id = value
 
                 elif key == 'next':
-                    if value not in existing_dotted_ids:
-                        continue
+                    if isinstance(value, int):
+                        if value not in existing_dotted_ids:
+                            value = "Next"
+                    else:
+                        # Invalid type for next
+                        raise ValueError(f"Invalid value for 'next': {value}. Must be an integer dotted_id or 'Next'")
+                    
+                    setattr(element, key, value)
 
                 elif key == 'ms_duration':
                     element.halt = (value == 0)
-
-                setattr(element, key, value)
+                    setattr(element, key, value)
+                
+                else:
+                    setattr(element, key, value)
             else:
                 raise ValueError(f"Invalid attribute '{key}' for CuelistElement")
+    
 
-    def find_next_dottedid(value: int, existing_dotted_ids: set) -> int:
+    def delete_cuelist(self, cuelist_id: int) -> None:
+        if cuelist_id not in self._cuelists:
+            raise ValueError(f"Cuelist with ID {cuelist_id} does not exist")
+        
+        # Check if cuelist is assigned to a playback currently
+        for playback in self._playbacks.values():
+            if playback.cuelist == cuelist_id:
+                raise ValueError(f"Cuelist with ID {cuelist_id} is currently assigned to playback {playback.combined_id}. Unable to delete.")
+
+        # Delete all cues and cuelistelements associated with this cuelist
+        for cuelist_element in self._cuelists[cuelist_id].cuelist_elements.values():
+            del self._cues[cuelist_element.cue_id]
+            del cuelist_element
+
+        del self._cuelists[cuelist_id]
+
+    def _find_next_dottedid(self, value: int, existing_dotted_ids: set) -> int:
         """
         Find the next available dotted_id using the specified logic:
         1. Round up to next multiple of 10 within the same hundred (620, 630, etc.)
@@ -541,15 +599,15 @@ class Lightshow:
         
         # Phase 1: Try multiples of 10 within the same hundred
         # Start from the next multiple of 10 after the current value
-        next_multiple_of_10 = ((value // 10) + 1) * 10
+        next_multiple_of_10 = base_hundred + 10
         
         for candidate in range(next_multiple_of_10, base_hundred + 100, 10):
-            if candidate not in existing_dotted_ids:
+            if candidate == value or candidate not in existing_dotted_ids:
                 return candidate
         
         # Phase 2: Try incrementing by 1 from the original value
         for candidate in range(value + 1, base_hundred + 100):
-            if candidate not in existing_dotted_ids:
+            if candidate == value or candidate not in existing_dotted_ids:
                 return candidate
         
         # If we reach here, the entire hundred block is full
@@ -570,6 +628,16 @@ class Lightshow:
         playback = Playback(page=page, index=index, cuelist=cuelist)
         self._playbacks[combined_id] = playback
 
+
+    def unassign_playback(self, page: int, index: int):
+        # Unassign playback by removing it from the playbacks dict.
+        combined_id = f"{page}.{index}"
+        if combined_id not in self._playbacks:
+            raise ValueError(f"Playback with page {page} and index {index} does not exist")
+        del self._playbacks[combined_id]
+
+
+
     def __repr__(self):
         return (
             f"Lightshow(fileinfo={self._fileinfo!r}, models={self._models!r}, "
@@ -579,6 +647,10 @@ class Lightshow:
             f"fxpalettes={self._fxpalettes!r}, general={self._general!r})"
         )
 
+
+
+
+    ### MISC ###
 
     def to_dict(self) -> Dict:
         def to_dict_recursive(obj):
