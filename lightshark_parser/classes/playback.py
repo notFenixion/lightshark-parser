@@ -180,7 +180,7 @@ class Playback:
                 num_attr += 1
 
                 if attr_name == "cuelist":
-                    if attr_value == "Next":
+                    if attr_value == "N/A":
                         content.extend(b'\xFF')
                     else:
                         content.extend(serialise_num_value(attr_value, cc_check=True))

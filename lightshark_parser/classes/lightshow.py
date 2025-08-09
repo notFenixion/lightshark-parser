@@ -330,6 +330,30 @@ class Lightshow:
             channel=channel,
         )
 
+    def _copy_order_to_referencing_cues(self, order_to_copy: Order, patch_id: int, ftype: int) -> None:
+        """
+        Helper method to copy an Order object to all cues that currently reference it.
+        This prevents breaking cues when removing orders from palettes.
+        """
+        # Find all cues that reference this specific order object
+        for cue in self._cues.values():
+            if (cue.orders and 
+                patch_id in cue.orders and 
+                ftype in cue.orders[patch_id] and
+                cue.orders[patch_id][ftype] is order_to_copy):
+                
+                # Create an independent copy of the order for this cue
+                cue.orders[patch_id][ftype] = Order(
+                    palette_id=0,  # Mark as cue-specific (no longer from palette)
+                    patch_id=order_to_copy.patch_id,
+                    ftype=order_to_copy.ftype,
+                    value=order_to_copy.value,
+                    universe=order_to_copy.universe,
+                    section=order_to_copy.section,
+                    receptor_type=order_to_copy.receptor_type,
+                    channel=order_to_copy.channel,
+                )
+
     ### PALETTE FUNCTIONS ###
 
     def update_palette_orders(self, palette_id: int, new_orders: dict[int, dict[int, int]]) -> None:
@@ -342,7 +366,9 @@ class Lightshow:
         - universe: universe of the patch. For virtual dimmers (ftype=516 + model uses virtual dimmer), universe is set to 9. [NOTE: unconfirmed]
         - section: ftyped is mapped to a section [NOTE: mapping is not fully complete]
         - receptor_type: if ftype=516, set to 1 [NOTE: unconfirmed]
-
+        
+        Orders that exist in the palette but are not specified in new_orders will be removed from the palette.
+        If those orders are shared with cues, the cues will get independent copies to prevent breaking.
         """
         if not isinstance(new_orders, dict):
             raise TypeError("new_orders must be a dictionary")
@@ -350,12 +376,34 @@ class Lightshow:
         palette = self._user_palettes.get(palette_id)
         if palette is None:
             raise ValueError(f"Palette with ID {palette_id} does not exist")
+        
+        # First, handle orders that will be removed - copy them to cues that reference them
+        for patch_id in list(palette.orders.keys()):
+            if patch_id in new_orders:
+                # Check ftypes that will be removed for this patch
+                for ftype in list(palette.orders[patch_id].keys()):
+                    if ftype not in new_orders[patch_id]:
+                        order_to_remove = palette.orders[patch_id][ftype]
+                        self._copy_order_to_referencing_cues(order_to_remove, patch_id, ftype)
+                        del palette.orders[patch_id][ftype]
+                # Remove empty patch dict if no ftypes remain
+                if not palette.orders[patch_id]:
+                    del palette.orders[patch_id]
+            else:
+                # All orders for this patch will be removed - copy them all to cues
+                for ftype, order_to_remove in palette.orders[patch_id].items():
+                    self._copy_order_to_referencing_cues(order_to_remove, patch_id, ftype)
+                del palette.orders[patch_id]
+        
+        # Then, update/create orders based on new_orders
         for patch_id, ftype_orders in new_orders.items():
+            # Initialize patch_id dict if it doesn't exist
+            if patch_id not in palette.orders:
+                palette.orders[patch_id] = {}
+                
             for ftype, value in ftype_orders.items():
                 if ftype not in palette.orders[patch_id]:
                     # Create a new Order if it doesn't exist
-                    
-
                     palette.orders[patch_id][ftype] = self.add_new_order(
                         palette_id=palette_id,
                         patch_id=patch_id,
@@ -450,11 +498,105 @@ class Lightshow:
             raise ValueError(f"Cue with ID {cue_id} does not exist")
 
         for key, value in updated_values.items():
-            if hasattr(cue, key) and key in ['fxs', 'fx_palette', 'fxs_channels', 'orders', 'description', 'name']:
+            if key == "orders":
+                self.update_cue_orders(cue_id, value)
+            elif hasattr(cue, key) and key in ['fxs', 'fx_palette', 'fxs_channels', 'description', 'name']:
                 setattr(cue, key, value)
             else:
                 raise ValueError(f"Invalid attribute '{key}' for Cue")
-
+    
+    def update_cue_orders(self, cue_id: int, new_orders: dict[int, dict[int, (int, int)]]) -> None:
+        """
+        Takes in a dict of {patch_id: {ftype: (value, palette_id)}} and updates Orders accordingly for a specific cue.
+        If new Order given has palette_id != 0, Order is set to reference the palette's corresponding Order.
+        Otherwise, follow the same logic as in update_palette_orders:
+        - If order doesn't exist yet, create it
+        - If order exists already, update value directly
+        
+        Orders that exist in the cue but are not specified in new_orders will be removed from the cue.
+        For palette-referenced orders (palette_id != 0), only the reference is removed (Order stays in palette).
+        For cue-specific orders (palette_id == 0), the Order object is deleted since only this cue uses it.
+        """
+        if not isinstance(new_orders, dict):
+            raise TypeError("new_orders must be a dictionary")
+        
+        cue = self._cues.get(cue_id)
+        if cue is None:
+            raise ValueError(f"Cue with ID {cue_id} does not exist")
+        
+        # Initialize cue.orders if it's None
+        if cue.orders is None:
+            cue.orders = {}
+        
+        # First, remove orders that are not in new_orders
+        for patch_id in list(cue.orders.keys()):
+            if patch_id in new_orders:
+                # Remove ftypes that are not in new_orders for this patch
+                for ftype in list(cue.orders[patch_id].keys()):
+                    if ftype not in new_orders[patch_id]:
+                        order_to_remove = cue.orders[patch_id][ftype]
+                        # Only delete the reference, not the Order object itself
+                        # The Order object will be garbage collected only if this was the last reference
+                        # (which happens automatically for cue-specific orders with palette_id=0)
+                        del cue.orders[patch_id][ftype]
+                # Remove empty patch dict if no ftypes remain
+                if not cue.orders[patch_id]:
+                    del cue.orders[patch_id]
+            else:
+                # Remove entire patch if not in new_orders
+                for ftype in cue.orders[patch_id]:
+                    # Same logic - just remove references, let garbage collection handle the rest
+                    pass
+                del cue.orders[patch_id]
+            
+        # Then, update/create orders based on new_orders
+        for patch_id, ftype_orders in new_orders.items():
+            # Initialize patch_id dict if it doesn't exist
+            if patch_id not in cue.orders:
+                cue.orders[patch_id] = {}
+                
+            for ftype, (palette_id, ftype_value) in ftype_orders.items():
+                # Check if we're replacing an existing order
+                existing_order = cue.orders[patch_id].get(ftype)
+                
+                if palette_id:
+                    # Want to reference a palette order
+                    new_order = self._user_palettes[palette_id].orders[patch_id][ftype]
+                    
+                    # If we're replacing a cue-specific order (palette_id=0), 
+                    # we need to ensure the old order gets cleaned up
+                    if (existing_order is not None and 
+                        hasattr(existing_order, 'palette_id') and 
+                        existing_order.palette_id == 0):
+                        # The old order was cue-specific, so removing this reference
+                        # should cause it to be garbage collected (which is what we want)
+                        pass
+                    
+                    cue.orders[patch_id][ftype] = new_order
+                else:
+                    # Want a cue-specific order (palette_id=0)
+                    if ftype not in cue.orders[patch_id]:
+                        # Create a new Order if it doesn't exist
+                        cue.orders[patch_id][ftype] = self.add_new_order(
+                            palette_id=0,
+                            patch_id=patch_id,
+                            ftype=ftype,
+                            value=ftype_value
+                        )
+                    else:
+                        # Check what type of existing order we have
+                        if (hasattr(existing_order, 'palette_id') and 
+                            existing_order.palette_id == 0):
+                            # Existing order is cue-specific, just update its value
+                            existing_order.value = ftype_value
+                        else:
+                            # Existing order is from a palette, need to replace with cue-specific
+                            cue.orders[patch_id][ftype] = self.add_new_order(
+                                palette_id=0,
+                                patch_id=patch_id,
+                                ftype=ftype,
+                                value=ftype_value
+                            )
 
 
     def delete_cue(self, cuelist_id: int, cue_id: int) -> None:
@@ -509,14 +651,6 @@ class Lightshow:
         updated_values: Dict[str, Any]   
     ):
         """
-        - if new_dottedid is taken in cuelist
-            - taken: assign it the next nontaken subcue id
-            - not taken: then just assign directly lol
-            Cue's visual_id is also updated to match the new dotted_id
-        - if next == a dottedid within cuelist's elements
-            - if yes, then assign it
-            - if no, no change occurs
-        - if ms_duration = 0, set halt to true. if not = 0 set halt to false
         """
         cuelist = self._cuelists.get(cuelist_id)
         if cuelist is None:
