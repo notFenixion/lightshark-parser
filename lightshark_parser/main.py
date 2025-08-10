@@ -9,13 +9,14 @@ from lightshark_parser.classes import Lightshow
 from lightshark_parser.parsers.section_parsers import *
 from lightshark_parser.utils.custom_errors import MarkerNotFoundError
 from lightshark_parser.parsers.file_parser import parse_file_bytes
+from lightshark_parser.utils.logger import logger
 
 
 def print_dash_line():
     try:
-        logging.info("-" * (os.get_terminal_size().columns - 5))
+        logger.info("-" * (os.get_terminal_size().columns - 5))
     except:
-        logging.info("-" * 80)
+        logger.info("-" * 80)
 
 
 
@@ -32,7 +33,28 @@ def setup_logging(verbosity=0):
     elif verbosity >= 2:
         log_level = logging.DEBUG
 
+    # Create named logger for the library
+    logger = logging.getLogger('lightshark_parser')
+    logger.setLevel(log_level)
+    
+    # Prevent propagation to root logger to avoid double logging
+    logger.propagate = False
+    
+    # Only add handler if none exists (prevents duplicate handlers)
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        formatter = logging.Formatter("%(levelname)s:%(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    else:
+        # Update existing handler level
+        for handler in logger.handlers:
+            handler.setLevel(log_level)
+    
+    # Configure root logger only for other libraries/modules that might use it
     logging.basicConfig(level=log_level, format="%(levelname)s:%(message)s", stream=sys.stderr)
+    
+    return logger
 
 
 def main():
@@ -95,11 +117,11 @@ def main():
                 else:
                     print(f"Summary saved to: {output_file}")
             except Exception as e:
-                logging.error("Error saving summary to %s: %s", output_file, str(e))
+                logger.error("Error saving summary to %s: %s", output_file, str(e))
                 sys.exit(1)
 
     except Exception as e:
-        logging.error("Error processing file: %s", str(e), exc_info=args.verbose > 0)
+        logger.error("Error processing file: %s", str(e), exc_info=args.verbose > 0)
         sys.exit(1)
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional, Union
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
+from lightshark_parser.utils.logger import logger
 
 class Cuelist:
 
@@ -135,7 +135,7 @@ class Cuelist:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialisation of Cuelist object {self.name}")
+        logger.debug(f"Starting serialisation of Cuelist object {self.name}")
         bytestr = bytearray(serialise_section_header("cuelist"))
         content = bytearray()
         num_attr = 0
@@ -170,8 +170,8 @@ class Cuelist:
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("Cuelist object serialised")
-        logging.debug(bytestr)
+        logger.info("Cuelist object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -240,7 +240,7 @@ class CuelistElement:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of CuelistElement object {self.cue_id}")
+        logger.debug(f"Starting serialization of CuelistElement object {self.cue_id}")
         bytestr = bytearray()
         num_attr = 0
         
@@ -266,6 +266,6 @@ class CuelistElement:
                     bytestr.extend(serialise_bool_value(attr_value))
 
         bytestr[0:0] = serialise_num_attr(num_attr)
-        logging.info("CuelistElement object serialised")
-        logging.debug(bytestr)
+        logger.info("CuelistElement object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
+from lightshark_parser.utils.logger import logger
 
 
 @dataclass
@@ -31,7 +31,7 @@ class ModelPalette:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of ModelPalette")
+        logger.debug(f"Starting serialization of ModelPalette")
         bytestr = bytearray()
         num_attr = 0
         
@@ -54,8 +54,8 @@ class ModelPalette:
 
         bytestr[0:0] = serialise_num_attr(num_attr)
         
-        logging.info("ModelPalette object serialised")
-        logging.debug(bytestr)
+        logger.info("ModelPalette object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -84,7 +84,7 @@ class ModelHardware:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of ModelHardware")
+        logger.debug(f"Starting serialization of ModelHardware")
         bytestr = bytearray()
         num_attr = 0
         
@@ -100,8 +100,8 @@ class ModelHardware:
 
         bytestr[0:0] = serialise_num_attr(num_attr)
         
-        logging.info("ModelHardware object serialised")
-        logging.debug(bytestr)
+        logger.info("ModelHardware object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -121,7 +121,7 @@ class MacroStep:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of MacroStep")
+        logger.debug(f"Starting serialization of MacroStep")
         bytestr = bytearray()
         num_attr = 0
         
@@ -146,8 +146,8 @@ class MacroStep:
 
         bytestr[0:0] = serialise_num_attr(num_attr)
         
-        logging.info("MacroStep object serialised")
-        logging.debug(bytestr)
+        logger.info("MacroStep object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -170,7 +170,7 @@ class Macro:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of Macro")
+        logger.debug(f"Starting serialization of Macro")
         bytestr = bytearray()
         num_attr = 0
         
@@ -192,8 +192,8 @@ class Macro:
 
         bytestr[0:0] = serialise_str_value(self.macro_type) + serialise_num_attr(num_attr)
         
-        logging.info("Macro object serialised")
-        logging.debug(bytestr)
+        logger.info("Macro object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -224,7 +224,7 @@ class ModelValueStep:
 
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of ModelValueStep")
+        logger.debug(f"Starting serialization of ModelValueStep")
         bytestr = bytearray()
         num_attr = 0
         
@@ -244,8 +244,8 @@ class ModelValueStep:
             raise ValueError("ModelValueStep object should have exactly 5 attributes. (NOTE: Unconfirmed)")
         bytestr[0:0] = serialise_objlist_len(num_attr)
         
-        logging.info("ModelValueStep object serialised")
-        logging.debug(bytestr)
+        logger.info("ModelValueStep object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -310,8 +310,8 @@ class ModelValue:
 
         bytestr[0:0] = serialise_num_attr(num_attr)
         
-        logging.info("ModelValue object serialised")
-        logging.debug(bytestr)
+        logger.info("ModelValue object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -383,7 +383,7 @@ class Model:
         )
 
     def to_bytes(self):
-        logging.debug(f"Starting serialization of Model {getattr(self, 'name', '')} (id: {getattr(self, 'model_id', 'N/A')})")
+        logger.debug(f"Starting serialization of Model {getattr(self, 'name', '')} (id: {getattr(self, 'model_id', 'N/A')})")
         bytestr = bytearray(serialise_section_header("model"))
         content = bytearray()
         num_attr = 0
@@ -434,6 +434,6 @@ class Model:
         
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("Model object serialised")
-        logging.debug(bytestr)
+        logger.info("Model object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

@@ -1,4 +1,3 @@
-import logging
 
 from ..utils.custom_errors import MarkerNotFoundError
 
@@ -165,14 +164,15 @@ def _read_list_attribute(file_bytes: bytes, ptr: int, obj: dict, attr_name: str,
 
 
 def _obj_checker(initial_ptr: int, ptr: int, obj_bytelength: int, num_attr: int, num_attr_indicated: int):
-    logging.debug("Current pointer: %s, Expected end: %s", ptr, initial_ptr + obj_bytelength)
+    logger.debug("Current pointer: %s, Expected end: %s", ptr, initial_ptr + obj_bytelength)
     if initial_ptr + obj_bytelength != ptr:
         raise ValueError(f"Object bytelength mismatch. Expected end at {initial_ptr + obj_bytelength}, but reached {ptr}")
-    logging.debug("Number of attributes found: %d, Expected: %d", num_attr, num_attr_indicated)
+    logger.debug("Number of attributes found: %d, Expected: %d", num_attr, num_attr_indicated)
     if num_attr != num_attr_indicated:
         raise ValueError(f"Attribute count mismatch. Found {num_attr} attributes, expected {num_attr_indicated}")
 
 
 # Register the function to be called on program exit
 import atexit
+from lightshark_parser.utils.logger import logger
 atexit.register(_write_markers_to_file)

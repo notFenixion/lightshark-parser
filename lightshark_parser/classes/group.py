@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
+from lightshark_parser.utils.logger import logger
 
 
 class Group:
@@ -141,7 +141,7 @@ class Group:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of Group object {self.description} (id: {self.group_id})")
+        logger.debug(f"Starting serialization of Group object {self.description} (id: {self.group_id})")
         bytestr = bytearray(serialise_section_header("group"))
         content = bytearray()
         num_attr = 0
@@ -180,8 +180,8 @@ class Group:
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("Group object serialised")
-        logging.debug(bytestr)
+        logger.info("Group object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 

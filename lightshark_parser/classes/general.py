@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
+from lightshark_parser.utils.logger import logger
 
 class Config:
         def __init__(
@@ -56,7 +56,7 @@ class Config:
             )
 
         def to_bytes(self) -> bytes:
-            logging.debug("Starting serialisation of Config object")
+            logger.debug("Starting serialisation of Config object")
             bytestr = bytearray(serialise_section_header("config"))
             content = bytearray()
             num_attr = 0
@@ -80,8 +80,8 @@ class Config:
             content[0:0] = serialise_num_attr(num_attr)
             bytestr.extend(serialise_content_length(content))
             bytestr.extend(content)
-            logging.info("Config object serialised")
-            logging.debug(bytestr)
+            logger.info("Config object serialised")
+            logger.debug(bytestr)
             return bytes(bytestr)
 
 class General:
@@ -103,7 +103,7 @@ class General:
         return cls(config=config)
 
     def to_bytes(self) -> bytes:
-        logging.debug("Starting serialisation of General object")
+        logger.debug("Starting serialisation of General object")
         bytestr = bytearray(serialise_section_header("#general#"))
         content = bytearray()
         
@@ -111,7 +111,7 @@ class General:
             content.extend(self.config.to_bytes())
 
         bytestr.extend(content)
-        logging.info("General object serialised")
-        logging.debug(bytestr)
+        logger.info("General object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 

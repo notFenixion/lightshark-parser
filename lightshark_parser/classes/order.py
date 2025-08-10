@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
 from dataclasses import dataclass
 from lightshark_parser.classes.patch import Patch
 from lightshark_parser.classes.model import Model
+from lightshark_parser.utils.logger import logger
 
 @dataclass
 class Order:
@@ -77,7 +77,7 @@ class Order:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of Order object for palette ID: {self.palette_id})")
+        logger.debug(f"Starting serialization of Order object for palette ID: {self.palette_id})")
         bytestr = bytearray()
         num_attr = 0
         
@@ -92,6 +92,6 @@ class Order:
                     bytestr.extend(serialise_num_value(attr_value, cc_check=True))
 
         bytestr[0:0] = serialise_num_attr(num_attr)
-        logging.info("Order object serialised")
-        logging.debug(bytestr)
+        logger.info("Order object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

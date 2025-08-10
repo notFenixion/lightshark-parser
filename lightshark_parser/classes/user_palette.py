@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
 from lightshark_parser.classes.order import Order
+from lightshark_parser.utils.logger import logger
 
 
 class UserPalette:
@@ -70,7 +70,7 @@ class UserPalette:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of UserPalette object {self.name} (id: {self.user_palette_id})")
+        logger.debug(f"Starting serialization of UserPalette object {self.name} (id: {self.user_palette_id})")
         bytestr = bytearray(serialise_section_header("user_palette"))
         content = bytearray()
         num_attr = 0
@@ -97,6 +97,6 @@ class UserPalette:
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("UserPalette object serialised")
-        logging.debug(bytestr)
+        logger.info("UserPalette object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

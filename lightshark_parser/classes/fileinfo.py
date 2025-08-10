@@ -1,7 +1,7 @@
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
+from lightshark_parser.utils.logger import logger
 
 
 
@@ -34,7 +34,7 @@ class Version:
         )
 
     def to_bytes(self):
-        logging.debug(f"Starting serialization of Version object")
+        logger.debug(f"Starting serialization of Version object")
         bytestr = bytearray(serialise_section_header("version"))
 
         content = bytearray()
@@ -60,8 +60,8 @@ class Version:
         
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("FileInfo version object serialised")
-        logging.debug(bytestr)
+        logger.info("FileInfo version object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
         
 
@@ -88,11 +88,11 @@ class FileInfo:
         return cls(version=version)
 
     def to_bytes(self):
-        logging.debug(f"Starting serialization of FileInfo section")
+        logger.debug(f"Starting serialization of FileInfo section")
         bytestr = bytearray(serialise_section_header("#fileinfo#"))
         for obj in self.__dict__.values():
             if obj is not None:
                 bytestr.extend(obj.to_bytes())
-        logging.info("FileInfo section serialised")
-        logging.debug(bytestr)
+        logger.info("FileInfo section serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional, Union
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
+from lightshark_parser.utils.logger import logger
 
 class Playback:
     def __init__(
@@ -158,7 +158,7 @@ class Playback:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialisation of Playback object {self.combined_id}")
+        logger.debug(f"Starting serialisation of Playback object {self.combined_id}")
         bytestr = bytearray(serialise_section_header("playback"))
         content = bytearray()
         num_attr = 0
@@ -197,6 +197,6 @@ class Playback:
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("Playback object serialised")
-        logging.debug(bytestr)
+        logger.info("Playback object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

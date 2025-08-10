@@ -4,7 +4,6 @@ from pathlib import Path
 from datetime import datetime
 from lightshark_parser.classes import cuelist
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
 import copy
 from lightshark_parser.classes.fileinfo import FileInfo
 from lightshark_parser.classes.model import Model
@@ -18,6 +17,7 @@ from lightshark_parser.classes.playback import Playback
 from lightshark_parser.classes.fx import FX, FXPalette
 from lightshark_parser.classes.general import General
 from lightshark_parser.utils.json_mappings import get_section_from_ftype
+from lightshark_parser.utils.logger import logger
 
 
 class Lightshow:
@@ -53,15 +53,20 @@ class Lightshow:
 
         self._parsed_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._fileinfo: FileInfo = fileinfo
-        self._models: Dict[int, Model] = models
-        self._patches: Dict[int, Patch] = patches
-        self._groups: Dict[int, Group] = groups
-        self._user_palettes: Dict[int, UserPalette] = user_palettes
-        self._cues: Dict[int, Cue] = cues
-        self._cuelists: Dict[int, Cuelist] = cuelists
-        self._playbacks: Dict[str, Playback] = playbacks
-        self._fxpalettes: Dict[int, FXPalette] = fxpalettes
+        self._models: Dict[int, Model] = models or {}
+        self._patches: Dict[int, Patch] = patches or {}
+        self._groups: Dict[int, Group] = groups or {}
+        self._user_palettes: Dict[int, UserPalette] = user_palettes or {}
+        self._cues: Dict[int, Cue] = cues or {}
+        self._cuelists: Dict[int, Cuelist] = cuelists or {}
+        self._playbacks: Dict[str, Playback] = playbacks or {}
+        self._fxpalettes: Dict[int, FXPalette] = fxpalettes or {}
         self._general: General = general
+        
+        # Log initialization summary
+        logger.info(f"Lightshow initialized with {len(models or {})} models, "
+                   f"{len(patches or {})} patches, {len(user_palettes or {})} palettes, "
+                   f"{len(cues or {})} cues, {len(cuelists or {})} cuelists")
 
     # Getters and setters
     # @property
@@ -221,7 +226,7 @@ class Lightshow:
     
     ### GROUP FUNCTIONS ###
 
-    def add_new_group(self, visual_id: int, patched_elements_ids: list[int]) -> None:
+    def add_new_group(self, visual_id: int, patched_elements_ids: list[int]) -> Group:
         """
         Group implementation already handles the grid, steps, etc. as optional attributes.
         Only group_id, visual_id, and patched_elements_ids are compulsory.
@@ -231,11 +236,13 @@ class Lightshow:
             raise TypeError("patched_elements_ids must be a list of integers")
         if not all(isinstance(id, int) for id in patched_elements_ids):
             raise TypeError("All elements in patched_elements_ids must be integers")
-        self._groups[group_id] = Group(
+        group = Group(
             patched_elements_ids=patched_elements_ids,
             group_id=group_id,
             visual_id=visual_id,
         )
+        self._groups[group_id] = group
+        return group
 
     def update_group(self, group_id: int, patched_elements_ids: Optional[list[int]] = None, visual_id: Optional[int] = None) -> None:
         """
@@ -319,7 +326,8 @@ class Lightshow:
                 channel += modelvalue.index
                 break
 
-        return Order(
+        
+        order = Order(
             palette_id=palette_id,
             patch_id=patch_id,
             ftype=ftype,
@@ -329,6 +337,39 @@ class Lightshow:
             receptor_type=1 if ftype == 516 else 0,
             channel=channel,
         )
+        logger.debug(f"Creatined order: patch_id={patch_id}, ftype={ftype}, value={value}, palette_id={palette_id}")
+        return order
+
+
+    def _get_or_create_order(self, patch_id: int, ftype: int, value: int, palette_id: int) -> Order:
+        """
+        Modular function to either:
+        - Create a new standalone order (if palette_id == 0)
+        - Return reference to existing palette order (if palette_id != 0)
+        
+        This handles the common pattern of "create new order or reference palette order depending on palette_id"
+        """
+        if palette_id == 0:
+            # Create standalone order
+            logger.debug(f"Creating standalone order for patch_id={patch_id}, ftype={ftype}")
+            return self.add_new_order(
+                palette_id=0,
+                patch_id=patch_id,
+                ftype=ftype,
+                value=value
+            )
+        else:
+            # Reference palette order
+            logger.debug(f"Referencing palette order: palette_id={palette_id}, patch_id={patch_id}, ftype={ftype}")
+            palette = self._user_palettes.get(palette_id)
+            if palette is None:
+                raise ValueError(f"Palette with ID {palette_id} does not exist")
+            
+            if (patch_id not in palette.orders or 
+                ftype not in palette.orders[patch_id]):
+                raise ValueError(f"Order for patch_id={patch_id}, ftype={ftype} does not exist in palette {palette_id}")
+            
+            return palette.orders[patch_id][ftype]
 
     def _copy_order_to_referencing_cues(self, order_to_copy: Order, patch_id: int, ftype: int) -> None:
         """
@@ -370,6 +411,8 @@ class Lightshow:
         Orders that exist in the palette but are not specified in new_orders will be removed from the palette.
         If those orders are shared with cues, the cues will get independent copies to prevent breaking.
         """
+        logger.info(f"Updating palette {palette_id} with {sum(len(ftypes) for ftypes in new_orders.values())} orders")
+        
         if not isinstance(new_orders, dict):
             raise TypeError("new_orders must be a dictionary")
         
@@ -404,6 +447,7 @@ class Lightshow:
             for ftype, value in ftype_orders.items():
                 if ftype not in palette.orders[patch_id]:
                     # Create a new Order if it doesn't exist
+                    logger.debug(f"Creating new order in palette {palette_id}: patch_id={patch_id}, ftype={ftype}, value={value}")
                     palette.orders[patch_id][ftype] = self.add_new_order(
                         palette_id=palette_id,
                         patch_id=patch_id,
@@ -412,11 +456,12 @@ class Lightshow:
                     )
                 else:
                     # Update the existing Order's value
+                    logger.debug(f"Updating existing order in palette {palette_id}: patch_id={patch_id}, ftype={ftype}, value={value}")
                     palette.orders[patch_id][ftype].value = value
         
 
 
-    def add_new_palette(self, orders: dict[int, dict[int, int]]):
+    def add_new_palette(self, orders: dict[int, dict[int, int]]) -> UserPalette:
 
         palette_id = max(self._user_palettes.keys(), default=0) + 1
         palette = UserPalette(
@@ -427,6 +472,7 @@ class Lightshow:
         self._user_palettes[palette_id] = palette
         self.update_palette_orders(palette_id=palette_id, new_orders=orders)
         palette.section = palette.orders[next(iter(orders))][next(iter(orders[next(iter(orders))]))].section 
+        return palette 
 
 
     def delete_palette(self, palette_id: int) -> None:
@@ -437,7 +483,7 @@ class Lightshow:
     ### CUE FUNCTIONS ###
 
 
-    def add_new_cue(self, cuelist_id: int, orders: dict[int, dict[int, List[int, int]]], fxs: List[FX]=None, fx_palette: Union[int, str] = "N/A"):
+    def add_new_cue(self, cuelist_id: int, orders: dict[int, dict[int, List[int, int]]], fxs: List[FX]=None, fx_palette: Union[int, str] = "N/A") -> Cue:
         """
         orders is {patch_id: {ftype: [value, palette_id]}}
         palette_id is optional, set to 0 if None (same as how file stores)
@@ -445,12 +491,22 @@ class Lightshow:
 
         i think fx_palette = "N/A" shld be handled alr???
 
-        NOTE: THIS ALSO RUNS add_cue_to_cuelist, so it will automatically add the cue to the cuelist on init.
+        NOTE: 
+        THIS ALSO RUNS add_cue_to_cuelist, so it will automatically add the cue to the cuelist on init.
+        Cues *must* be assigned to exactly 1 cuelist.
         """
+        logger.info(f"Adding new cue to cuelist {cuelist_id}.")
+        
         cuelist = self._cuelists.get(cuelist_id)
         
-        visual_id = max(cuelist.cuelist_elements, key=lambda c: c.dotted_id, default=0)
-        visual_id = ((visual_id // 100) + 1) * 100
+        # Find the highest dotted_id in cuelist elements and calculate next visual_id
+        if cuelist.cuelist_elements:
+            # Get the maximum dotted_id from the CuelistElement objects (not the keys)
+            max_dotted_id = max(element.dotted_id for element in cuelist.cuelist_elements.values())
+            visual_id = ((max_dotted_id // 100) + 1) * 100
+        else:
+            # Empty cuelist, start at 1.00
+            visual_id = 100
 
         if fxs == [] or fxs == None:
             fxs_channels = [0 for _ in range(16)]
@@ -460,31 +516,30 @@ class Lightshow:
 
         cue_id = max(self._cues.keys(), default=0) + 1
 
-    
+        # Process orders and create/get Order objects
+        processed_orders = {}
         for patch_id, ftype_orders in orders.items():
+            processed_orders[patch_id] = {}
             for ftype, order_values in ftype_orders.items():
                 value, palette_id = order_values
-                if palette_id == 0:
-                    order_values = self.add_new_order(
-                        palette_id=palette_id,
-                        patch_id=patch_id,
-                        ftype=ftype,
-                        value=value
-                    )
-                else:
-                    order_values = self._user_palettes[palette_id].orders[patch_id][ftype]
-  
+                # Use modular function to handle order creation/referencing
+                order = self._get_or_create_order(patch_id, ftype, value, palette_id)
+                processed_orders[patch_id][ftype] = order
+
         cue = Cue(
-            cuelist_id=cuelist_id,
             cue_id=cue_id,
             visual_id=visual_id,
-            orders=orders,
+            orders=processed_orders,
             fxs=fxs,
             fx_palette=fx_palette,
-            fxs_channels=fxs_channels
+            fxs_channels=fxs_channels,
+            name = f"Cue {cue_id}"
         )
         self._cues[cue_id] = cue
-        self._add_cue_to_cuelist(cue_id)
+        self._add_cue_to_cuelist(cue_id, cuelist_id)
+        
+        logger.info(f"Successfully created cue {cue_id} with visual_id {visual_id} in cuelist {cuelist_id}")
+        return cue
 
 
     def update_cue(self, cue_id: int, updated_values: Dict[str, Any]) -> None:
@@ -517,6 +572,8 @@ class Lightshow:
         For palette-referenced orders (palette_id != 0), only the reference is removed (Order stays in palette).
         For cue-specific orders (palette_id == 0), the Order object is deleted since only this cue uses it.
         """
+        logger.info(f"Updating orders for cue {cue_id} with {sum(len(ftypes) for ftypes in new_orders.values())} orders")
+        
         if not isinstance(new_orders, dict):
             raise TypeError("new_orders must be a dictionary")
         
@@ -555,52 +612,33 @@ class Lightshow:
             if patch_id not in cue.orders:
                 cue.orders[patch_id] = {}
                 
-            for ftype, (palette_id, ftype_value) in ftype_orders.items():
+            for ftype, (value, palette_id) in ftype_orders.items():
                 # Check if we're replacing an existing order
                 existing_order = cue.orders[patch_id].get(ftype)
                 
-                if palette_id:
-                    # Want to reference a palette order
-                    new_order = self._user_palettes[palette_id].orders[patch_id][ftype]
-                    
-                    # If we're replacing a cue-specific order (palette_id=0), 
-                    # we need to ensure the old order gets cleaned up
-                    if (existing_order is not None and 
-                        hasattr(existing_order, 'palette_id') and 
-                        existing_order.palette_id == 0):
-                        # The old order was cue-specific, so removing this reference
-                        # should cause it to be garbage collected (which is what we want)
-                        pass
-                    
-                    cue.orders[patch_id][ftype] = new_order
-                else:
-                    # Want a cue-specific order (palette_id=0)
-                    if ftype not in cue.orders[patch_id]:
-                        # Create a new Order if it doesn't exist
-                        cue.orders[patch_id][ftype] = self.add_new_order(
-                            palette_id=0,
-                            patch_id=patch_id,
-                            ftype=ftype,
-                            value=ftype_value
-                        )
+                if existing_order is not None:
+                    # Case 1: patch_id, ftype pair is already taken
+                    if existing_order.palette_id == 0:
+                        # Case 1a: old order has palette_id == 0 -> delete order, replace with new
+                        logger.debug(f"Case 1a: Replacing cue-specific order (patch_id={patch_id}, ftype={ftype}) with {'palette reference' if palette_id != 0 else 'new cue-specific order'}")
+                        pass  # The reference will be overwritten below
                     else:
-                        # Check what type of existing order we have
-                        if (hasattr(existing_order, 'palette_id') and 
-                            existing_order.palette_id == 0):
-                            # Existing order is cue-specific, just update its value
-                            existing_order.value = ftype_value
-                        else:
-                            # Existing order is from a palette, need to replace with cue-specific
-                            cue.orders[patch_id][ftype] = self.add_new_order(
-                                palette_id=0,
-                                patch_id=patch_id,
-                                ftype=ftype,
-                                value=ftype_value
-                            )
+                        # Case 1b: old order has palette_id != 0 -> don't delete order, just replace reference
+                        logger.debug(f"Case 1b: Replacing palette reference (patch_id={patch_id}, ftype={ftype}) with {'new palette reference' if palette_id != 0 else 'cue-specific order'}")
+                        pass  # The reference will be overwritten below
+                    
+                    # In both cases, replace with new order/reference
+                    cue.orders[patch_id][ftype] = self._get_or_create_order(patch_id, ftype, value, palette_id)
+                else:
+                    # Case 2: pair is not taken -> create new order or reference
+                    logger.debug(f"Case 2: Creating new {'palette reference' if palette_id != 0 else 'cue-specific order'} (patch_id={patch_id}, ftype={ftype})")
+                    cue.orders[patch_id][ftype] = self._get_or_create_order(patch_id, ftype, value, palette_id)
 
 
     def delete_cue(self, cuelist_id: int, cue_id: int) -> None:
         # Deletes the cuelist_elements as well
+        logger.info(f"Deleting cue {cue_id} from cuelist {cuelist_id}")
+        
         cuelist = self._cuelists.get(cuelist_id)
         dotted_id = self._cues[cue_id].visual_id
         if cuelist is None:
@@ -610,11 +648,13 @@ class Lightshow:
 
         del cuelist.cuelist_elements[dotted_id]
         del self._cues[cue_id]
+        logger.info(f"Successfully deleted cue {cue_id} and its cuelist element")
 
     ### CUELIST FUNCTIONS ###
 
-    def add_new_cuelist(self) -> None:
-
+    def add_new_cuelist(self) -> Cuelist:
+        logger.info("Creating new cuelist")
+        
         cuelist_id = max(self._cuelists.keys(), default=0) + 1
         visual_id = max((cuelist.visual_id for cuelist in self._cuelists.values()), default=0) + 1
         # rest of the attributes will use the default init
@@ -623,10 +663,13 @@ class Lightshow:
             visual_id=visual_id
         )
         self._cuelists[cuelist_id] = cuelist
+        
+        logger.info(f"Created cuelist {cuelist_id} with visual_id {visual_id}")
         return cuelist
 
-    def _add_cue_to_cuelist(self, cue_id: int) -> None:
-        # Doesnt take in a cuelist_id cuz thats alr in the Cue
+    def _add_cue_to_cuelist(self, cue_id: int, cuelist_id: int) -> None:
+        logger.debug(f"Adding cue {cue_id} to cuelist {cuelist_id}")
+        
         cue = self._cues.get(cue_id)
         if cue is None:
             raise ValueError(f"Cue with ID {cue_id} does not exist")
@@ -643,15 +686,16 @@ class Lightshow:
             next="Next"
         )
 
-        self._cuelists[cue.cuelist_id].cuelist_elements[cue.visual_id] = cuelist_element
+        self._cuelists[cuelist_id].cuelist_elements[cue.visual_id] = cuelist_element
+        logger.debug(f"Successfully added cue {cue_id} to cuelist {cuelist_id} with dotted_id {cue.visual_id}")
 
     def update_cuelist_element(self,
         cuelist_id: int,
         curr_dotted_id: int,
         updated_values: Dict[str, Any]   
     ):
-        """
-        """
+        logger.debug(f"Updating cuelist element with cuelist_id={cuelist_id}, dotted_id={curr_dotted_id}: {updated_values}")
+
         cuelist = self._cuelists.get(cuelist_id)
         if cuelist is None:
             raise ValueError(f"Cuelist with ID {cuelist_id} does not exist")
@@ -668,7 +712,7 @@ class Lightshow:
                     if value <= 100:
                         continue
                     if value in existing_dotted_ids:
-                        logging.debug(f"Dotted ID {value} already exists in cuelist {cuelist_id}. Finding next available dotted_id.")
+                        logger.debug(f"Dotted ID {value} already exists in cuelist {cuelist_id}. Finding next available dotted_id.")
                         value = self._find_next_dottedid(value, existing_dotted_ids)
                     
                     # Update the dotted_id on the element object
@@ -703,6 +747,8 @@ class Lightshow:
     
 
     def delete_cuelist(self, cuelist_id: int) -> None:
+        logger.info(f"Deleting cuelist {cuelist_id}")
+        
         if cuelist_id not in self._cuelists:
             raise ValueError(f"Cuelist with ID {cuelist_id} does not exist")
         
@@ -712,11 +758,15 @@ class Lightshow:
                 raise ValueError(f"Cuelist with ID {cuelist_id} is currently assigned to playback {playback.combined_id}. Unable to delete.")
 
         # Delete all cues and cuelistelements associated with this cuelist
+        cue_count = len(self._cuelists[cuelist_id].cuelist_elements)
+        logger.debug(f"Deleting {cue_count} cues from cuelist {cuelist_id}")
+        
         for cuelist_element in self._cuelists[cuelist_id].cuelist_elements.values():
             del self._cues[cuelist_element.cue_id]
             del cuelist_element
 
         del self._cuelists[cuelist_id]
+        logger.info(f"Successfully deleted cuelist {cuelist_id} and {cue_count} associated cues")
 
     def _find_next_dottedid(self, value: int, existing_dotted_ids: set) -> int:
         """
@@ -752,15 +802,17 @@ class Lightshow:
 
     ### PLAYBACK FUNCTIONS ###
 
-    def assign_playback(self, page: int, index: int, cuelist: int):
+    def assign_playback(self, page: int, index: int, cuelist_id: int):
         # Assign cuelist to blank playback.
         # Can't assign to a taken playback cuz that would just record cue to cuelist
         
         combined_id = f"{page}.{index}"
         if combined_id in self._playbacks:
             raise ValueError(f"Playback with page {page} and index {index} already exists")
-        playback = Playback(page=page, index=index, cuelist=cuelist)
+        playback = Playback(page=page, index=index, cuelist=cuelist_id)
         self._playbacks[combined_id] = playback
+
+        logger.info(f"Assigned cuelist {cuelist_id} to playback {combined_id}")
 
 
     def unassign_playback(self, page: int, index: int):
@@ -769,6 +821,8 @@ class Lightshow:
         if combined_id not in self._playbacks:
             raise ValueError(f"Playback with page {page} and index {index} does not exist")
         del self._playbacks[combined_id]
+
+        logger.info(f"Unassigned playback {combined_id}")
 
 
 
@@ -849,10 +903,10 @@ class Lightshow:
         if isinstance(filepath, str):
             filepath = Path(filepath)
         
-        logging.debug(f"Saving Lightshow summary to {filepath}")
+        logger.debug(f"Saving Lightshow summary to {filepath}")
         with open(filepath, "w") as f:
             f.write(self.summarise())
-        logging.info(f"Lightshow summary saved to {filepath}")
+        logger.info(f"Lightshow summary saved to {filepath}")
     
     def save_lightshow(self, filepath: Union[str, Path]) -> None:
         if isinstance(filepath, str):
@@ -860,14 +914,14 @@ class Lightshow:
         if not filepath.suffix == ".lshw":
             raise ValueError("Filepath must have .lshw extension")
         
-        logging.debug(f"Saving Lightshow to {filepath}")
+        logger.debug(f"Saving Lightshow to {filepath}")
         with open(filepath, "wb") as f:
             f.write(self.to_bytes())
-        logging.info(f"Lightshow saved to {filepath}")
+        logger.info(f"Lightshow saved to {filepath}")
 
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of Lightshow object")
+        logger.debug(f"Starting serialization of Lightshow object")
         bytestr = bytearray()
         if self._fileinfo is not None:
             bytestr.extend(self._fileinfo.to_bytes())

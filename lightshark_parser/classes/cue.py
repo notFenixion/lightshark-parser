@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional, Union
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
 from lightshark_parser.classes.fx import FX
 from lightshark_parser.classes.order import Order
 from lightshark_parser.classes.action import Action
+from lightshark_parser.utils.logger import logger
 
 class Cue:
     """
@@ -47,21 +47,24 @@ class Cue:
 
     def to_dict(self) -> dict:
         fxs_list = []
-        for fx in self.fxs:
-            if hasattr(fx, "to_dict"):
-                fxs_list.append(fx.to_dict())
-            elif hasattr(fx, "__dict__"):
-                fxs_list.append(fx.__dict__)
-            else:
-                fxs_list.append(fx)
+        if self.fxs is not None:
+            for fx in self.fxs:
+                if hasattr(fx, "to_dict"):
+                    fxs_list.append(fx.to_dict())
+                elif hasattr(fx, "__dict__"):
+                    fxs_list.append(fx.__dict__)
+                else:
+                    fxs_list.append(fx)
 
-        orders_dict = {
-            patch_id: {
-                ftype: order.to_dict() if hasattr(order, "to_dict") else order
-                for ftype, order in ftype_orders.items()
+        orders_dict = {}
+        if self.orders is not None:
+            orders_dict = {
+                patch_id: {
+                    ftype: order.to_dict() if hasattr(order, "to_dict") else order
+                    for ftype, order in ftype_orders.items()
+                }
+                for patch_id, ftype_orders in self.orders.items()
             }
-            for patch_id, ftype_orders in self.orders.items()
-        }
 
         return {
             "fx_palette": self.fx_palette,
@@ -69,7 +72,7 @@ class Cue:
             "description": self.description,
             "visual_id": self.visual_id,
             "actions": self.actions,
-            "fxs": fxs_list if self.fxs else None,  # Set to None if no fxs
+            "fxs": fxs_list,  # Always return the list (empty if no fxs)
             "fxs_channels": self.fxs_channels,
             "orders": orders_dict,
             "name": self.name,
@@ -103,7 +106,7 @@ class Cue:
 
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of Cue object {self.name} (id: {self.cue_id})")
+        logger.debug(f"Starting serialization of Cue object {self.name} (id: {self.cue_id})")
         bytestr = bytearray(serialise_section_header("cue"))
         content = bytearray()
         num_attr = 0
@@ -163,6 +166,6 @@ class Cue:
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("Cue object serialised")
-        logging.debug(bytestr)
+        logger.info("Cue object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
+from lightshark_parser.utils.logger import logger
 
 class Patch:
     def __init__(
@@ -100,7 +100,7 @@ class Patch:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of Patch object {self.name} (ID: {self.id})")
+        logger.debug(f"Starting serialization of Patch object {self.name} (ID: {self.id})")
         bytestr = bytearray(serialise_section_header("patch"))
 
         content = bytearray()
@@ -135,6 +135,6 @@ class Patch:
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("Patch object serialised")
-        logging.debug(bytestr)
+        logger.info("Patch object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import Dict, List, Any, Optional, Union
 from lightshark_parser.serialisers.attribute_serialisers import *
-import logging
 
 from lightshark_parser.classes.order import Order
 from lightshark_parser.classes.action import Action
+from lightshark_parser.utils.logger import logger
 
 class FX:
     def __init__(
@@ -134,7 +134,7 @@ class FX:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of FX object {self.name}")
+        logger.debug(f"Starting serialization of FX object {self.name}")
         bytestr = bytearray()
         num_attr = 0
         
@@ -167,8 +167,8 @@ class FX:
                         bytestr.extend(layer.to_bytes())
 
         bytestr[0:0] = serialise_num_attr(num_attr)
-        logging.info("FX object serialised")
-        logging.debug(bytestr)
+        logger.info("FX object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -237,7 +237,7 @@ class FXLayer:
             )
 
         def to_bytes(self) -> bytes:
-            logging.debug(f"Starting serialization of FXLayer object {self.id}")
+            logger.debug(f"Starting serialization of FXLayer object {self.id}")
             bytestr = bytearray()
             num_attr = 0
             
@@ -263,8 +263,8 @@ class FXLayer:
                             bytestr.extend(step.to_bytes())
 
             bytestr[0:0] = serialise_num_attr(num_attr)
-            logging.info("FXLayer object serialised")
-            logging.debug(bytestr)
+            logger.info("FXLayer object serialised")
+            logger.debug(bytestr)
             return bytes(bytestr)
 
 
@@ -340,7 +340,7 @@ class FXLayerStep:
         )
 
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of FXLayerStep object {self.name}")
+        logger.debug(f"Starting serialization of FXLayerStep object {self.name}")
         bytestr = bytearray()
         num_attr = 0
         
@@ -361,8 +361,8 @@ class FXLayerStep:
                     bytestr.extend(serialise_str_value(attr_value))
 
         bytestr[0:0] = serialise_num_attr(num_attr)
-        logging.info("FXLayerStep object serialised")
-        logging.debug(bytestr)
+        logger.info("FXLayerStep object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)
 
 
@@ -462,7 +462,7 @@ class FXPalette:
         )
         
     def to_bytes(self) -> bytes:
-        logging.debug(f"Starting serialization of FXPalette object {self.name} (id: {self.fx_palette})")
+        logger.debug(f"Starting serialization of FXPalette object {self.name} (id: {self.fx_palette})")
         bytestr = bytearray(serialise_section_header("fxpalette"))
         content = bytearray()
         num_attr = 0
@@ -484,7 +484,7 @@ class FXPalette:
                     content.extend(serialise_objlist_len(num_lists))
                     for fx_channel in attr_value:
                         list_content = bytearray()
-                        logging.debug(fx_channel)
+                        logger.debug(fx_channel)
                         list_len = sum(1 for value in fx_channel if not isinstance(value, str))
                         if list_len != 16:
                             raise ValueError(f"FX channel list length should be 16, {list_len} detected (NOTE: unconfirmed. though this error shouldn't happen either way...)")
@@ -511,6 +511,6 @@ class FXPalette:
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
-        logging.info("FXPalette object serialised")
-        logging.debug(bytestr)
+        logger.info("FXPalette object serialised")
+        logger.debug(bytestr)
         return bytes(bytestr)

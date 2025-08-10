@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 import orjson
@@ -7,12 +6,13 @@ from pathlib import Path
 from lightshark_parser.classes import Lightshow
 from lightshark_parser.parsers.section_parsers import *
 from lightshark_parser.utils.custom_errors import MarkerNotFoundError
+from lightshark_parser.utils.logger import logger
 
 def print_dash_line():
     try:
-        logging.info("-" * (os.get_terminal_size().columns - 5))
+        logger.info("-" * (os.get_terminal_size().columns - 5))
     except:
-        logging.info("-" * 80)
+        logger.info("-" * 80)
 
 
 def parse_lshw(filepath: str, output_file: str = None) -> Lightshow:
@@ -83,13 +83,13 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
     print("Starting parsing...")
     ## FILEINFO ##
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#fileinfo#":
-        logging.warning("Could not find #fileinfo# in file. If your file contains a fileinfo section, please fix it.")
+        logger.warning("Could not find #fileinfo# in file. If your file contains a fileinfo section, please fix it.")
     else:
         ptr += 15
         fileinfo, ptr = read_fileinfo(file_bytes, ptr)
-        logging.info("FOUND FILEINFO: %s", fileinfo.__dict__)
+        logger.info("FOUND FILEINFO: %s", fileinfo.__dict__)
         for obj in fileinfo.__dict__.values():
-            logging.info("Found object: %s", obj.__dict__)
+            logger.info("Found object: %s", obj.__dict__)
         print_dash_line()
 
     ## MODELS ##
@@ -104,13 +104,13 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         if model.model_id in models:
             raise ValueError(f"Duplicate model ID found: {model.model_id}")
         models[model.model_id] = model
-        logging.info("FOUND MODEL: %s", model.__dict__)
+        logger.info("FOUND MODEL: %s", model.__dict__)
         print_dash_line()
     if not models:
-        logging.warning("No models found in file. Did you configure models and patches yet?")
+        logger.warning("No models found in file. Did you configure models and patches yet?")
 
     ## PATCHES ##
-    logging.info("Finished reading models. Moving onto patches...")
+    logger.info("Finished reading models. Moving onto patches...")
     if file_bytes[ptr : ptr + 15] != b"\x00\x00\x00\x0b\xaa#patching#":
         raise MarkerNotFoundError("Could not find #patching# in file")
     patching = {}
@@ -121,10 +121,10 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         if patch.id in patching:
             raise ValueError(f"Duplicate patch ID found: {patch.id}")
         patching[patch.id] = patch
-        logging.info("FOUND PATCH: %s", patch.__dict__)
+        logger.info("FOUND PATCH: %s", patch.__dict__)
         print_dash_line()
     if not patching:
-        logging.warning(
+        logger.warning(
             "No patches found in file. This warning is only a concern if there are patches in your show but none were detected."
         )
 
@@ -139,14 +139,14 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         if group.group_id in groups:
             raise ValueError(f"Duplicate group ID found: {group.group_id}")
         groups[group.group_id] = group
-        logging.info("FOUND GROUP: %s", group.__dict__)
+        logger.info("FOUND GROUP: %s", group.__dict__)
         print_dash_line()
     if not groups:
-        logging.warning("No groups found in file. This warning is only a concern if there are groups in your show but none were detected.")
+        logger.warning("No groups found in file. This warning is only a concern if there are groups in your show but none were detected.")
 
     ## USER PALETTES ##
     print("Finished reading groups. Moving onto user palettes...")
-    # logging.debug(file_bytes[ptr:ptr+20])
+    # logger.debug(file_bytes[ptr:ptr+20])
     if file_bytes[ptr : ptr + 20] != b"\x00\x00\x00\x10\xaf#user_palettes#":
         raise MarkerNotFoundError("Could not find #user_palettes# in file")
     user_palettes = {}
@@ -158,7 +158,7 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         ptr += (17 if not deleted_flag else 16)
         # For logging a unique case wherein a user_palette was deleted. Not sure if this is just an issue with a show, more testing required.
         if file_bytes[ptr : ptr + 16] == b"\x00\x00\x0d\xacuser_palette":
-            logging.warning(
+            logger.warning(
                 "user_palette marker '\\x00\\x00\\x0d\\xacuser_palette' was found at position %d instead of expected '\\x00\\x00\\x00\\x0d\\xacuser_palette'. This may be a case wherein a user_palette was deleted and is thus ignored. It is recommended to check for missing user_palette_ids",
                 ptr
             )
@@ -170,10 +170,10 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
             if palette.user_palette_id in user_palettes:
                 raise ValueError(f"Duplicate user palette ID found: {palette.user_palette_id}")
             user_palettes[palette.user_palette_id] = palette
-            logging.info("FOUND PALETTE: %s", palette.__dict__)
+            logger.info("FOUND PALETTE: %s", palette.__dict__)
             print_dash_line()
     if not user_palettes:
-        logging.warning(
+        logger.warning(
             "No user palettes found in file. This warning is only a concern if there are user palettes in your show but none were detected."
         )
 
@@ -189,10 +189,10 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         if cue.cue_id in cues:
             raise ValueError(f"Duplicate cue ID found: {cue.cue_id}")
         cues[cue.cue_id] = cue
-        logging.info("FOUND CUE: %s", cue.__dict__)
+        logger.info("FOUND CUE: %s", cue.__dict__)
         print_dash_line()
     if not cues:
-        logging.warning("No cues found in file. This warning is only a concern if there are cues in your show but none were detected.")
+        logger.warning("No cues found in file. This warning is only a concern if there are cues in your show but none were detected.")
 
     ## CUELISTS ##
     print("Finished reading cues. Moving onto cuelists...")
@@ -206,10 +206,10 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         if cuelist.cuelist_id in cuelists:
             raise ValueError(f"Duplicate cuelist ID found: {cuelist.cuelist_id}")
         cuelists[cuelist.cuelist_id] = cuelist
-        logging.info("FOUND CUELIST: %s", cuelist.__dict__)
+        logger.info("FOUND CUELIST: %s", cuelist.__dict__)
         print_dash_line()
     if not cuelists:
-        logging.warning(
+        logger.warning(
             "No cuelists found in file. This warning is only a concern if there are cuelists in your show but none were detected."
         )
 
@@ -225,10 +225,10 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         if playback.combined_id in playbacks:
             raise ValueError(f"Duplicate playback ID found: {playback.combined_id}")
         playbacks[playback.combined_id] = playback
-        logging.info("FOUND PLAYBACK (ID: %s): %s", playback.combined_id, playback.__dict__)
+        logger.info("FOUND PLAYBACK (ID: %s): %s", playback.combined_id, playback.__dict__)
         print_dash_line()
     if not playbacks:
-        logging.warning(
+        logger.warning(
             "No playbacks found in file. This warning is only a concern if there are playback faders assigned in your show but none were detected."
         )
 
@@ -238,17 +238,17 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
         raise MarkerNotFoundError("Could not find #general# in file")
     ptr += 14
     general, ptr = read_general(file_bytes, ptr)
-    logging.info("FOUND GENERAL: %s", general.__dict__)
+    logger.info("FOUND GENERAL: %s", general.__dict__)
     for obj in general.__dict__.values():
-        logging.info("Found object: %s", obj.__dict__)
+        logger.info("Found object: %s", obj.__dict__)
     print_dash_line()
     if not general:
-        logging.warning("No general found in file. This warning is only a concern if there is general in your show but none were detected.")
+        logger.warning("No general found in file. This warning is only a concern if there is general in your show but none were detected.")
 
     ## FX PALETTES ##
     print("Finished reading general. Moving onto FX palettes...")
     if file_bytes[ptr : ptr + 17] != b"\x00\x00\x00\x0d\xac#fxpalettes#":
-        logging.warning("Could not find #fxpalettes# in file.")
+        logger.warning("Could not find #fxpalettes# in file.")
     else:
         fxpalettes = {}
         ptr += 17
@@ -258,14 +258,14 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
             if fxpalette.fx_palette in fxpalettes:
                 raise ValueError(f"Duplicate FX palette ID found: {fxpalette.fx_palette}")
             fxpalettes[fxpalette.fx_palette] = fxpalette
-            logging.info("FOUND FX PALETTE: %s", fxpalette.__dict__)
+            logger.info("FOUND FX PALETTE: %s", fxpalette.__dict__)
             print_dash_line()
         if not fxpalettes:
-            logging.warning(
+            logger.warning(
                 "No fx palettes found in file. This warning is only a concern if there are fx palettes in your show but none were detected."
             )
 
-    logging.info("Finished reading FX palettes. Parsing complete! (until schedules is done)")
+    logger.info("Finished reading FX palettes. Parsing complete! (until schedules is done)")
 
     # Create Lightshow object
     lightshow = Lightshow(
@@ -295,16 +295,16 @@ def parse_file_bytes(file_bytes: bytes, output_file: str = None,  filepath: str 
                 with open(output_path, "wb") as f:
                     f.write(json_bytes)
 
-                logging.info(f"Successfully saved to {output_path}")
+                logger.info(f"Successfully saved to {output_path}")
 
             except TypeError as e:
-                logging.error("TypeError during JSON serialization: %s", e)
+                logger.error("TypeError during JSON serialization: %s", e)
                 if isinstance(data, dict):
-                    logging.debug("Attempting to find non-serializable object...")
+                    logger.debug("Attempting to find non-serializable object...")
                     _debug_serialization(data)
                 raise
         except Exception as e:
-            logging.error("Error saving to %s: %s", output_file, e, exc_info=True)
+            logger.error("Error saving to %s: %s", output_file, e, exc_info=True)
             print(f"Error saving to {output_file}. Check logs for details.", file=sys.stderr)
             raise
 
@@ -323,11 +323,11 @@ def _debug_serialization(obj, path=""):
             try:
                 orjson.dumps({k: v})
             except TypeError as e:
-                logging.error("Found non-serializable object at path: %s", current_path)
-                logging.error("Type: %s, Value: %s", type(v).__name__, repr(v))
-                logging.error("Error: %s", str(e))
+                logger.error("Found non-serializable object at path: %s", current_path)
+                logger.error("Type: %s, Value: %s", type(v).__name__, repr(v))
+                logger.error("Error: %s", str(e))
                 if hasattr(v, "__dict__"):
-                    logging.error("Object attributes: %s", v.__dict__.keys())
+                    logger.error("Object attributes: %s", v.__dict__.keys())
             if isinstance(v, (dict, list)):
                 _debug_serialization(v, current_path)
     elif isinstance(obj, list):
@@ -336,10 +336,10 @@ def _debug_serialization(obj, path=""):
             try:
                 orjson.dumps([v])
             except TypeError as e:
-                logging.error("Found non-serializable object in list at path: %s", current_path)
-                logging.error("Type: %s, Value: %s", type(v).__name__, repr(v))
-                logging.error("Error: %s", str(e))
+                logger.error("Found non-serializable object in list at path: %s", current_path)
+                logger.error("Type: %s, Value: %s", type(v).__name__, repr(v))
+                logger.error("Error: %s", str(e))
                 if hasattr(v, "__dict__"):
-                    logging.error("Object attributes: %s", v.__dict__.keys())
+                    logger.error("Object attributes: %s", v.__dict__.keys())
             if isinstance(v, (dict, list)):
                 _debug_serialization(v, current_path)
