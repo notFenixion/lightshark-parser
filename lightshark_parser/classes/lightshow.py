@@ -313,8 +313,10 @@ class Lightshow:
     
     ### ORDER FUNCTIONS ###
 
-    def add_new_order(self, palette_id, patch_id, ftype, value) -> Order:
+    def add_new_order(self, palette_id: int, patch_id: int, ftype: int, value: int) -> Order:
+        logger.debug(f"Adding new order: palette_id={palette_id}, patch_id={patch_id}, ftype={ftype}, value={value}")
         patch = self._patches.get(patch_id)
+        logger.debug(f"Obtained patch {patch} in add_new_order")
         model = self._models.get(patch.model_id)
         universe = patch.universe
         if ftype == 516 and model.use_virtual_dimmer:
@@ -509,7 +511,7 @@ class Lightshow:
             visual_id = 100
 
         if fxs == [] or fxs == None:
-            fxs_channels = [0 for _ in range(16)]
+            fxs_channels = [[0 for _ in range(16)]]
         else:
             # TO BE IMPLEMENTED :(
             pass
@@ -553,26 +555,30 @@ class Lightshow:
             raise ValueError(f"Cue with ID {cue_id} does not exist")
 
         for key, value in updated_values.items():
-            if key == "orders":
-                self.update_cue_orders(cue_id, value)
-            elif hasattr(cue, key) and key in ['fxs', 'fx_palette', 'fxs_channels', 'description', 'name']:
+            if hasattr(cue, key) and key in ['fxs', 'fx_palette', 'fxs_channels', 'description', 'name']:
                 setattr(cue, key, value)
             else:
                 raise ValueError(f"Invalid attribute '{key}' for Cue")
     
-    def update_cue_orders(self, cue_id: int, new_orders: dict[int, dict[int, (int, int)]]) -> None:
+    def update_cue_orders(self, cue_id: int, new_orders: dict[int, dict[int, (int, int)]], update_mode: int = 1) -> None:
         """
-        Takes in a dict of {patch_id: {ftype: (value, palette_id)}} and updates Orders accordingly for a specific cue.
-        If new Order given has palette_id != 0, Order is set to reference the palette's corresponding Order.
-        Otherwise, follow the same logic as in update_palette_orders:
-        - If order doesn't exist yet, create it
-        - If order exists already, update value directly
+        Updates Orders for a specific cue based on the update_mode.
         
-        Orders that exist in the cue but are not specified in new_orders will be removed from the cue.
-        For palette-referenced orders (palette_id != 0), only the reference is removed (Order stays in palette).
-        For cue-specific orders (palette_id == 0), the Order object is deleted since only this cue uses it.
+        Args:
+            cue_id: ID of the cue to update
+            new_orders: Dict of {patch_id: {ftype: (value, palette_id)}}
+            update_mode: 
+                1 (override) - Completely replaces current orders with new_orders
+                2 (edit) - Updates specified orders and applies palette desyncing logic
+                3 (delete) - Deletes specified orders from the cue
+        
+        For mode 2 (edit), if an order with palette_id != 0 is edited, all orders of that 
+        patch that used the same palette have their palette_id set to 0 (desynced).
         """
-        logger.info(f"Updating orders for cue {cue_id} with {sum(len(ftypes) for ftypes in new_orders.values())} orders")
+        if update_mode not in [1, 2, 3]:
+            raise ValueError("update_mode must be 1 (override), 2 (edit), or 3 (delete)")
+        
+        logger.info(f"Updating orders for cue {cue_id} with mode {update_mode} and {sum(len(ftypes) for ftypes in new_orders.values())} orders")
         
         if not isinstance(new_orders, dict):
             raise TypeError("new_orders must be a dictionary")
@@ -585,25 +591,30 @@ class Lightshow:
         if cue.orders is None:
             cue.orders = {}
         
+        if update_mode == 1:  # Override mode
+            self._update_cue_orders_override(cue, new_orders)
+        elif update_mode == 2:  # Edit mode
+            self._update_cue_orders_edit(cue, new_orders)
+        elif update_mode == 3:  # Delete mode
+            self._update_cue_orders_delete(cue, new_orders)
+        
+        # Perform garbage collection and palette desyncing cleanup
+        self._cleanup_unused_orders()
+    
+    def _update_cue_orders_override(self, cue: 'Cue', new_orders: dict[int, dict[int, (int, int)]]) -> None:
+        """Override mode: completely replaces current orders with new_orders."""
         # First, remove orders that are not in new_orders
         for patch_id in list(cue.orders.keys()):
             if patch_id in new_orders:
                 # Remove ftypes that are not in new_orders for this patch
                 for ftype in list(cue.orders[patch_id].keys()):
                     if ftype not in new_orders[patch_id]:
-                        order_to_remove = cue.orders[patch_id][ftype]
-                        # Only delete the reference, not the Order object itself
-                        # The Order object will be garbage collected only if this was the last reference
-                        # (which happens automatically for cue-specific orders with palette_id=0)
                         del cue.orders[patch_id][ftype]
                 # Remove empty patch dict if no ftypes remain
                 if not cue.orders[patch_id]:
                     del cue.orders[patch_id]
             else:
                 # Remove entire patch if not in new_orders
-                for ftype in cue.orders[patch_id]:
-                    # Same logic - just remove references, let garbage collection handle the rest
-                    pass
                 del cue.orders[patch_id]
             
         # Then, update/create orders based on new_orders
@@ -621,11 +632,9 @@ class Lightshow:
                     if existing_order.palette_id == 0:
                         # Case 1a: old order has palette_id == 0 -> delete order, replace with new
                         logger.debug(f"Case 1a: Replacing cue-specific order (patch_id={patch_id}, ftype={ftype}) with {'palette reference' if palette_id != 0 else 'new cue-specific order'}")
-                        pass  # The reference will be overwritten below
                     else:
                         # Case 1b: old order has palette_id != 0 -> don't delete order, just replace reference
                         logger.debug(f"Case 1b: Replacing palette reference (patch_id={patch_id}, ftype={ftype}) with {'new palette reference' if palette_id != 0 else 'cue-specific order'}")
-                        pass  # The reference will be overwritten below
                     
                     # In both cases, replace with new order/reference
                     cue.orders[patch_id][ftype] = self._get_or_create_order(patch_id, ftype, value, palette_id)
@@ -633,6 +642,93 @@ class Lightshow:
                     # Case 2: pair is not taken -> create new order or reference
                     logger.debug(f"Case 2: Creating new {'palette reference' if palette_id != 0 else 'cue-specific order'} (patch_id={patch_id}, ftype={ftype})")
                     cue.orders[patch_id][ftype] = self._get_or_create_order(patch_id, ftype, value, palette_id)
+    
+    def _update_cue_orders_edit(self, cue: 'Cue', new_orders: dict[int, dict[int, (int, int)]]) -> None:
+        """Edit mode: updates specified orders and applies palette desyncing logic."""
+        palettes_to_desync = set()  # Track which palettes need desyncing for this patch
+        
+        for patch_id, ftype_orders in new_orders.items():
+            # Initialize patch_id dict if it doesn't exist
+            if patch_id not in cue.orders:
+                cue.orders[patch_id] = {}
+                
+            for ftype, (value, palette_id) in ftype_orders.items():
+                existing_order = cue.orders[patch_id].get(ftype)
+                
+                # If we're editing an order that was referencing a palette, mark for desyncing
+                if existing_order is not None and existing_order.palette_id != 0:
+                    palettes_to_desync.add((patch_id, existing_order.palette_id))
+                    logger.debug(f"Marking patch {patch_id} palette {existing_order.palette_id} for desyncing due to edit")
+                
+                # Update or create the order
+                cue.orders[patch_id][ftype] = self._get_or_create_order(patch_id, ftype, value, palette_id)
+                logger.debug(f"Edit mode: Updated order (patch_id={patch_id}, ftype={ftype}) with value={value}, palette_id={palette_id}")
+        
+        # Apply palette desyncing logic
+        for patch_id, palette_id in palettes_to_desync:
+            self._desync_patch_palette_orders(cue, patch_id, palette_id)
+    
+    def _update_cue_orders_delete(self, cue: 'Cue', orders_to_delete: dict[int, dict[int, (int, int)]]) -> None:
+        """Delete mode: removes specified orders from the cue."""
+        palettes_to_desync = set()  # Track which palettes need desyncing for this patch
+        
+        for patch_id, ftype_orders in orders_to_delete.items():
+            if patch_id not in cue.orders:
+                continue  # Nothing to delete for this patch
+                
+            for ftype in ftype_orders.keys():
+                if ftype in cue.orders[patch_id]:
+                    existing_order = cue.orders[patch_id][ftype]
+                    
+                    # If we're deleting an order that was referencing a palette, mark for desyncing
+                    if existing_order.palette_id != 0:
+                        palettes_to_desync.add((patch_id, existing_order.palette_id))
+                        logger.debug(f"Marking patch {patch_id} palette {existing_order.palette_id} for desyncing due to deletion")
+                    
+                    del cue.orders[patch_id][ftype]
+                    logger.debug(f"Delete mode: Removed order (patch_id={patch_id}, ftype={ftype})")
+                
+            # Remove empty patch dict if no ftypes remain
+            if not cue.orders[patch_id]:
+                del cue.orders[patch_id]
+        
+        # Apply palette desyncing logic for remaining orders
+        for patch_id, palette_id in palettes_to_desync:
+            self._desync_patch_palette_orders(cue, patch_id, palette_id)
+    
+    def _desync_patch_palette_orders(self, cue: 'Cue', patch_id: int, palette_id: int) -> None:
+        """
+        Desyncs all orders for a specific patch that reference a specific palette.
+        Sets their palette_id to 0 and creates independent copies.
+        """
+        if patch_id not in cue.orders:
+            return
+            
+        for ftype, order in cue.orders[patch_id].items():
+            if order.palette_id == palette_id:
+                # Create an independent copy with palette_id = 0
+                cue.orders[patch_id][ftype] = Order(
+                    palette_id=0,  # Mark as cue-specific (desynced from palette)
+                    patch_id=order.patch_id,
+                    ftype=order.ftype,
+                    value=order.value,
+                    universe=order.universe,
+                    section=order.section,
+                    receptor_type=order.receptor_type,
+                    channel=order.channel,
+                )
+                logger.debug(f"Desynced order (patch_id={patch_id}, ftype={ftype}) from palette {palette_id}")
+    
+    def _cleanup_unused_orders(self) -> None:
+        """
+        Garbage collection function that cleans up unused orders.
+        This function can be expanded to include more sophisticated cleanup logic.
+        """
+        # Note: Python's garbage collector will automatically clean up Order objects
+        # that are no longer referenced. This function is a placeholder for any
+        # explicit cleanup logic that might be needed in the future.
+        logger.debug("Performing cleanup of unused orders")
+        pass
 
 
     def delete_cue(self, cuelist_id: int, cue_id: int) -> None:
@@ -694,7 +790,7 @@ class Lightshow:
         curr_dotted_id: int,
         updated_values: Dict[str, Any]   
     ):
-        logger.debug(f"Updating cuelist element with cuelist_id={cuelist_id}, dotted_id={curr_dotted_id}: {updated_values}")
+        logger.info(f"Updating cuelist element with cuelist_id={cuelist_id}, dotted_id={curr_dotted_id}: {updated_values}")
 
         cuelist = self._cuelists.get(cuelist_id)
         if cuelist is None:
@@ -745,6 +841,14 @@ class Lightshow:
             else:
                 raise ValueError(f"Invalid attribute '{key}' for CuelistElement")
     
+    def move_cuelist(self, cuelist_id: int , new_visual_id: int):
+        logger.info(f"Moving cuelist {cuelist_id} to new visual_id {new_visual_id}")
+        cuelist = self._cuelists.get(cuelist_id)
+        if cuelist is None:
+            raise ValueError(f"Cuelist with ID {cuelist_id} does not exist")
+
+        # Update the visual_id of the cuelist
+        cuelist.visual_id = new_visual_id
 
     def delete_cuelist(self, cuelist_id: int) -> None:
         logger.info(f"Deleting cuelist {cuelist_id}")
@@ -762,8 +866,13 @@ class Lightshow:
         logger.debug(f"Deleting {cue_count} cues from cuelist {cuelist_id}")
         
         for cuelist_element in self._cuelists[cuelist_id].cuelist_elements.values():
+            logger.debug(f"test {cuelist_element.cue_id}")
+            cue_id = cuelist_element.cue_id
+            logger.debug(f"test {cuelist_element.cue_id}")
             del self._cues[cuelist_element.cue_id]
+            logger.debug(f"test {cuelist_element.cue_id}")
             del cuelist_element
+            logger.debug(f"Deleted cue {cue_id} from cuelist {cuelist_id}")
 
         del self._cuelists[cuelist_id]
         logger.info(f"Successfully deleted cuelist {cuelist_id} and {cue_count} associated cues")
@@ -797,9 +906,50 @@ class Lightshow:
         # If we reach here, the entire hundred block is full
         raise ValueError(f"No available dotted_id found in the range {base_hundred}-{base_hundred + 99}. All positions are occupied.")
 
+    def move_cuelist(self, cuelist_id: int, new_visual_id: int) -> None:
+        """
+        Move a cuelist to a new visual ID position.
         
+        Args:
+            cuelist_id: ID of the cuelist to move
+            new_visual_id: New visual ID position for the cuelist
+            
+        Raises:
+            ValueError: If cuelist doesn't exist or new_visual_id is already taken
+        """
+        logger.info(f"Moving cuelist {cuelist_id} to visual_id {new_visual_id}")
+        
+        # Check if cuelist exists
+        if cuelist_id not in self._cuelists:
+            raise ValueError(f"Cuelist with ID {cuelist_id} does not exist")
+        
+        # Get all existing visual_ids
+        visual_ids = [cuelist.visual_id for cuelist in self._cuelists.values()]
+        
+        # Check if new_visual_id is already taken by another cuelist
+        if new_visual_id in visual_ids:
+            # Find which cuelist has this visual_id
+            conflicting_cuelist = None
+            for clist in self._cuelists.values():
+                if clist.visual_id == new_visual_id:
+                    conflicting_cuelist = clist
+                    break
+            
+            # Only raise error if it's a different cuelist (not moving to same position)
+            if conflicting_cuelist and conflicting_cuelist.cuelist_id != cuelist_id:
+                raise ValueError(f"Visual ID {new_visual_id} already exists for cuelist {conflicting_cuelist.cuelist_id}. Cannot move cuelist {cuelist_id} to this visual ID.")
+        
+        # Update the visual_id
+        cuelist = self._cuelists[cuelist_id]
+        old_visual_id = cuelist.visual_id
+        cuelist.visual_id = new_visual_id
+        
+        logger.info(f"Successfully moved cuelist {cuelist_id} from visual_id {old_visual_id} to {new_visual_id}")
 
 
+    ### PLAYBACK FUNCTIONS ###
+
+    
     ### PLAYBACK FUNCTIONS ###
 
     def assign_playback(self, page: int, index: int, cuelist_id: int):

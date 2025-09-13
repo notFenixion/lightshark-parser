@@ -27,7 +27,7 @@ class Cuelist:
         no_first_fade: Optional[bool] = False,
         name: Optional[str] = None,
         block_fx: Optional[bool] = False,
-        cuelist_elements: Optional[Dict[int, CuelistElement]] = {},
+        cuelist_elements: Optional[Dict[int, CuelistElement]] = None,
         ms_flash_hold: Optional[int] = 2000,
         ms_stop_time: Optional[int] = 2000,
     ) -> None:
@@ -56,7 +56,7 @@ class Cuelist:
         self.no_first_fade: Optional[bool] = no_first_fade
         self.name: Optional[str] = name
         self.block_fx: Optional[bool] = block_fx
-        self.cuelist_elements: Dict[int, CuelistElement] = cuelist_elements
+        self.cuelist_elements: Dict[int, CuelistElement] = cuelist_elements if cuelist_elements is not None else {}
         self.ms_flash_hold: Optional[int] = ms_flash_hold
         self.ms_stop_time: Optional[int] = ms_stop_time
 

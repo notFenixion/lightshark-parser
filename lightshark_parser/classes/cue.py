@@ -19,7 +19,7 @@ class Cue:
         cue_id: Optional[int] = None,
         description: Optional[str] = None,
         visual_id: Optional[int] = None,
-        fxs: Optional[List["FX"]] = [],
+        fxs: Optional[List["FX"]] = None,
         fxs_channels: Optional[List[List[Union[int, str]]]] = None,
         orders: Optional[dict[int, dict[int, Order]]] = None,
         actions: Optional[List["Action"]] = None,
@@ -29,7 +29,7 @@ class Cue:
         self.cue_id: int = cue_id
         self.description: str = description
         self.visual_id: int = visual_id
-        self.fxs: List[FX] = fxs
+        self.fxs: List[FX] = fxs if fxs is not None else []
         self.fxs_channels: List[dict] = fxs_channels
         self.orders: dict[int, dict[int, Order]] = orders
         self.actions: List[Action] = actions
@@ -118,7 +118,7 @@ class Cue:
             if attr_value is not None:
                 content.extend(serialise_attr_name(attr_name))
                 num_attr += 1
-                
+                logger.debug("Serialising attribute: " + attr_name)
                 if attr_name == "fx_palette":
                     if attr_value == "N/A":
                         content.extend(b'\xFF')
@@ -131,7 +131,11 @@ class Cue:
                 elif attr_name == 'fxs_channels':
                     num_lists = len(attr_value)
                     content.extend(serialise_objlist_len(num_lists))
+                    logger.debug(f"value: {attr_value}")
+                    logger.debug(f"Number of FX channel instances: {num_lists}")
+
                     for fx_channel in attr_value:
+                        logger.debug(f"channel: {fx_channel}")
                         list_content = bytearray()
                         list_len = sum(1 for value in fx_channel if not isinstance(value, str))
                         if list_len != 16:
@@ -162,6 +166,7 @@ class Cue:
                     # bytestr.extend(serialise_objlist_len(num_actions))
                     # for action in attr_value:
                     #     bytestr.extend(action.to_bytes())
+                logger.debug(f"Serialized {attr_name} for Cue {self.name} (id: {self.cue_id})")
 
         content[0:0] = serialise_num_attr(num_attr)
         bytestr.extend(serialise_content_length(content))

@@ -178,9 +178,9 @@ class Playback:
             if attr_value is not None:
                 content.extend(serialise_attr_name(attr_name))
                 num_attr += 1
-
+                logger.debug(f"attr_name: {attr_name}, attr_value: {attr_value}")
                 if attr_name == "cuelist":
-                    if attr_value == "N/A":
+                    if attr_value == "Next":
                         content.extend(b'\xFF')
                     else:
                         content.extend(serialise_num_value(attr_value, cc_check=True))
@@ -198,5 +198,4 @@ class Playback:
         bytestr.extend(serialise_content_length(content))
         bytestr.extend(content)
         logger.info("Playback object serialised")
-        logger.debug(bytestr)
         return bytes(bytestr)
