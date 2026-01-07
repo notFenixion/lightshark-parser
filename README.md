@@ -2,6 +2,8 @@
 
 lightshark-parser is a Python library for parsing show files used in the [Lightshark](https://lightshark.es/) software (`.lshw`).
 
+DISCLAIMER: I haven't uploaded it on PyPI yet so pip installing is currently unavailable. Please clone the repo instead if you wish to use it
+
 ## Features
 
 ### Parsing .lshw files
