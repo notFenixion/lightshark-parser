@@ -66,8 +66,5 @@ If no output file is provided, output_file will default to `<input_path>.json` o
 
 ```python
 from lightshark_parser import Lightshow, parse_file_bytes
-
-
-
 ```
 
