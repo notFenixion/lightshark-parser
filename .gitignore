@@ -6,7 +6,7 @@ Lightshows/
 *.txt
 private_tests/
 tests/analyze_show.py
-
+ARCHITECTURE.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

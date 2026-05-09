@@ -1,5 +1,5 @@
 
-NOTE: This is just a rough template used during planning. Not representative of actual summary output.
+NOTE: This is just a rough template used during planning. Not representative of actual summary output formatting, but content-wise it is the same.
 
 
 === SHOW INFO ===
