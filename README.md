@@ -1,5 +1,9 @@
 # lightshark-parser
 
+> [!NOTE]
+> **UPDATE 08/08/2026:**<br>
+> It has been brought to my attention that `.lshw` files are just serialised using MessagePack, meaning that this project is largely obsolete for its parsing purposes... However, the contextual schema information is still relatively useful. For more details, check out the documentation at https://lightshark-lshw-docs.pages.dev/.
+
 lightshark-parser is a Python library for parsing show files used in the [Lightshark](https://lightshark.es/) software (`.lshw`).
 
 ## Installation
@@ -45,8 +49,6 @@ After editing, you can use the `to_bytes()` method to write it back into a .lshw
 
 
 
-
-
 ## Usage
 
 Lightshark Parser can be used both from the command line and using Python code.
@@ -54,7 +56,7 @@ Lightshark Parser can be used both from the command line and using Python code.
 ### Command line
 
 ```bash
-lightshark-parser -p/s <input_file> -o <output_file>
+lightshark-parser (-p | -s) <input-file> -o <output-file>
 ```
 
 - `-p` : Parse file
