@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > **UPDATE 08/08/2026:**<br>
-> It has been brought to my attention that `.lshw` files are just serialised using MessagePack, meaning that this project is largely obsolete for its parsing purposes... However, the contextual schema information is still relatively useful. For more details, check out the documentation at https://lightshark-lshw-docs.pages.dev/.
+> It has been brought to my attention that `.lshw` files are just serialised using MessagePack, meaning that this project is largely obsolete for its parsing purposes... However, the contextual schema information is still relatively useful. For more details, check out the documentation at https://lightshark-lshw-docs.pages.dev/, or the web editor I made at https://lightshark-editor.onrender.com/.
 
 lightshark-parser is a Python library for parsing show files used in the [Lightshark](https://lightshark.es/) software (`.lshw`).
 
